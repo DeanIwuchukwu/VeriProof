@@ -31,8 +31,11 @@ export function fmtDate(iso: string | null): string {
   });
 }
 
+type HistoryFilter = "ALL" | "PASS" | "FLAG" | "FAIL";
+
 export function HistoryPanel() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
+  const [filter, setFilter] = useState<HistoryFilter>("ALL");
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, HistoryDetail>>({});
@@ -41,16 +44,29 @@ export function HistoryPanel() {
 
   // Repeat runs of the same record (same TTB ID) are grouped: newest shown,
   // a "×N runs" chip expands the older ones. Records without a TTB ID stand alone.
+  // Filtering happens per run, before grouping.
   const groups = useMemo(() => {
     if (!items) return [];
+    const visible = filter === "ALL" ? items : items.filter((it) => it.overall === filter);
     const map = new Map<string, HistoryItem[]>();
-    for (const it of items) {
+    for (const it of visible) {
       const key = it.ttb_id ?? it.verification_id;
       const arr = map.get(key);
       if (arr) arr.push(it);
       else map.set(key, [it]);
     }
     return [...map.entries()];
+  }, [items, filter]);
+
+  const chips = useMemo(() => {
+    const n = (s: HistoryFilter) =>
+      items ? items.filter((it) => it.overall === s).length : 0;
+    return [
+      { id: "ALL" as HistoryFilter, label: "All", n: items?.length ?? 0 },
+      { id: "PASS" as HistoryFilter, label: "Passed", n: n("PASS") },
+      { id: "FLAG" as HistoryFilter, label: "Review", n: n("FLAG") },
+      { id: "FAIL" as HistoryFilter, label: "Failed", n: n("FAIL") },
+    ];
   }, [items]);
 
   function toggleGroup(key: string) {
@@ -151,6 +167,23 @@ export function HistoryPanel() {
         </button>
       </div>
 
+      <div className="banner" style={{ background: "#fff", borderBottomColor: "var(--divider-2)" }}>
+        <div className="batch-filter">
+          {chips
+            .filter((c) => c.id === "ALL" || c.n > 0)
+            .map((c) => (
+              <button
+                key={c.id}
+                className={`filter-chip ${filter === c.id ? "active" : ""}`}
+                aria-pressed={filter === c.id}
+                onClick={() => setFilter(c.id)}
+              >
+                {c.label} {c.n}
+              </button>
+            ))}
+        </div>
+      </div>
+
       <div className="results-body">
         <div className="history-head">
           <span className="col-label">DATE</span>
@@ -160,6 +193,11 @@ export function HistoryPanel() {
           <span className="col-label">DECISION</span>
           <span className="col-label" aria-hidden="true" />
         </div>
+        {groups.length === 0 && (
+          <p className="note" style={{ padding: "14px 16px" }}>
+            No saved runs match this filter.
+          </p>
+        )}
         {groups.map(([key, group]) => {
           const groupOpen = openGroups.has(key);
           const visible = groupOpen ? group : [group[0]];
