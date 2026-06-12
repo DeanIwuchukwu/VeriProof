@@ -17,6 +17,7 @@ from app.extraction.schema import ExtractedField, ExtractedLabel
 
 from . import rules
 from .normalize import (
+    company_match,
     fuzzy_equal,
     net_contents_match,
     parse_abv,
@@ -177,29 +178,39 @@ class MatchEngine:
                             confidence=ex.net_contents.confidence, source_image=ex.net_contents.source_image)
 
     def _producer(self, claimed: ClaimedFields, ex: ExtractedLabel) -> FieldVerdict:
+        claimed_display = claimed.dba_tradename or claimed.applicant_name_address
         candidates = [c for c in (claimed.applicant_name_address, claimed.dba_tradename) if c]
-        if not ex.producer_name.present or not ex.producer_name.value:
+        # A label may name a producer/bottler AND a separate importer; the applicant can
+        # be either. Match against both (SPEC §4).
+        label_parties = [
+            ("producer", ex.producer_name),
+            ("importer", ex.importer_name),
+        ]
+        present = [(kind, f.value, f) for kind, f in label_parties if f.present and f.value]
+        if not present:
             return FieldVerdict(field="producer_name", label="Producer / Bottler", status=Status.FLAG,
-                                claimed=claimed.dba_tradename or claimed.applicant_name_address, extracted=None,
-                                reason="Producer/bottler name not clearly found on the label.",
-                                confidence=ex.producer_name.confidence)
+                                claimed=claimed_display, extracted=None,
+                                reason="No producer/bottler or importer name clearly found on the label.")
         if not candidates:
-            return _info("producer_name", "Producer / Bottler", None, ex.producer_name,
-                         f"Label shows producer '{ex.producer_name.value}'; no application value to compare.")
-        if any(fuzzy_equal(ex.producer_name.value, c) for c in candidates):
-            via = " (matches approved trade name / DBA)" if (
-                claimed.dba_tradename and fuzzy_equal(ex.producer_name.value, claimed.dba_tradename)
-            ) else ""
-            return FieldVerdict(field="producer_name", label="Producer / Bottler", status=Status.PASS,
-                                claimed=claimed.dba_tradename or claimed.applicant_name_address,
-                                extracted=ex.producer_name.value,
-                                reason=f"Producer matches the applicant{via}.",
-                                confidence=ex.producer_name.confidence, source_image=ex.producer_name.source_image)
+            first = present[0][2]
+            return _info("producer_name", "Producer / Bottler", None, first,
+                         f"Label shows '{first.value}'; no application value to compare.")
+        for kind, value, field in present:
+            if any(_name_matches(value, c) for c in candidates):
+                via = (
+                    " (matches approved trade name / DBA)"
+                    if claimed.dba_tradename and _name_matches(value, claimed.dba_tradename)
+                    else ""
+                )
+                return FieldVerdict(field="producer_name", label="Producer / Bottler", status=Status.PASS,
+                                    claimed=claimed_display, extracted=value,
+                                    reason=f"Label {kind} matches the applicant{via}.",
+                                    confidence=field.confidence, source_image=field.source_image)
+        shown = "; ".join(f"{kind}: {value}" for kind, value, _ in present)
         return FieldVerdict(field="producer_name", label="Producer / Bottler", status=Status.FLAG,
-                            claimed=claimed.dba_tradename or claimed.applicant_name_address,
-                            extracted=ex.producer_name.value,
-                            reason=f"Label producer '{ex.producer_name.value}' did not clearly match the applicant or approved DBA.",
-                            confidence=ex.producer_name.confidence, source_image=ex.producer_name.source_image)
+                            claimed=claimed_display, extracted=shown,
+                            reason="Label producer/importer did not clearly match the applicant or approved DBA.",
+                            confidence=present[0][2].confidence, source_image=present[0][2].source_image)
 
     def _country(self, claimed: ClaimedFields, ex: ExtractedLabel) -> FieldVerdict:
         if claimed.source == ProductSource.IMPORTED:
@@ -252,6 +263,11 @@ class MatchEngine:
 
 def _values(*fields: ExtractedField) -> list[str]:
     return [f.value for f in fields if f.present and f.value]
+
+
+def _name_matches(value: str | None, candidate: str | None) -> bool:
+    """Producer/importer name match: exact/substring fuzzy, or distinctive-token overlap."""
+    return fuzzy_equal(value, candidate) or company_match(value, candidate)
 
 
 def _info(field: str, label: str, claimed: str | None, ex_field: ExtractedField, reason: str) -> FieldVerdict:

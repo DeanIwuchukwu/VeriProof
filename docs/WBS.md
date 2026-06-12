@@ -39,12 +39,12 @@ in [SPEC.md §8](SPEC.md)) that verify it. Top-level packages follow the build o
 - **3.12** `[x]` Engine unit-test suite (20 tests, TC-02…TC-13 + extras) — *F4* ✓
 - **3.13** `[x]` `/verify/cola` + `/verify/manual` endpoints (both modes), friendly error layer, processing-time — *F1, F2, N6* ✓
 
-## 4.0 Single-record UI (both input modes)
-- **4.1** `[ ]` App shell: clean, high-contrast, large-target, keyboard + screen-reader (Section 508) — *N2, N3*
-- **4.2** `[ ]` Input mode 1 — COLA-record upload flow (drop 5100.31 → parse + verify) — *F1*
-- **4.3** `[ ]` Input mode 2 — manual-entry verification form (text field per claimed value: brand, fanciful, class/type, ABV, net contents, producer, source, country) + label-image upload; comparison (values entered) & extract-only (blank) sub-modes — *F2* → TC-02, TC-05, TC-08, TC-09, TC-10
-- **4.4** `[ ]` Wire both modes to `/verify`; loading + error states — *N6*
-- **4.5** `[ ]` Report view: per-field rows (extracted vs claimed, verdict, reason, confidence, source image), overall verdict, **processing-time badge**, low-quality-image notice — *F6, F7, N1, N6* → TC-13, TC-15
+## 4.0 Single-record UI (both input modes) — React/Vite, plain CSS design system
+- **4.1** `[x]` App shell: navy masthead, high-contrast, large targets, visible focus, semantic HTML, ARIA tabs/live regions — *N2, N3* (formal 508 audit = 6.7)
+- **4.2** `[x]` Input mode 1 — COLA-record upload flow (drag-drop/picker → parse + verify) — *F1* ✓ browser-verified
+- **4.3** `[x]` Input mode 2 — manual-entry form (field per claimed value + image upload; comparison & extract-only sub-modes) — *F2* ✓ renders; engine path shared with mode 1
+- **4.4** `[x]` Wire both modes to `/verify` (api.ts), loading + friendly error states — *N6* ✓
+- **4.5** `[x]` Report view: per-field rows (claimed vs label, verdict pill, reason, **read confidence**), overall banner, **processing-time badge**, low-quality notice, assistive disclaimer — *F6, F7, N1, N6* ✓ browser-verified
 
 ## 5.0 Batch verification
 - **5.1** `[ ]` `/verify/batch` endpoint — concurrent processing, rate-limit aware — *F5* → TC-14
@@ -75,6 +75,6 @@ build on a proven core.
 
 - **M1 — Reads real records:** ✅ **DONE** — parser extracts claimed fields (incl. checkbox type/source) + label images from all 5 real records; 11 unit tests green, ruff clean.
 - **M2 — Verifies correctly:** ✅ **DONE (engine)** — 3.x complete; engine passes TC-02…TC-13 on hostile variants (41 tests green, ruff clean); both API modes working with Fake provider. Real-image vision pass deferred to M5/e2e (needs API key).
-- **M3 — Usable single-record app:** 4.x done; <5 s, accessible, friendly errors (TC-13, TC-15).
+- **M3 — Usable single-record app:** ✅ **DONE (UI)** — both input modes + color-coded report browser-verified end-to-end (parse→extract→match→report), processing-time badge, read confidence, friendly errors, accessible by construction. Real-vision <5s latency (TC-15) + formal 508 audit (6.7) at M5.
 - **M4 — Batch:** 5.x done (TC-14).
 - **M5 — Delivered:** 6.x done; deployed URL, README, docs; full real-record + PRD-example pass.

@@ -46,6 +46,7 @@ class FakeVisionProvider(VisionProvider):
             net_contents=f("750 mL"),
             producer_name=f("Old Tom Distillery"),
             producer_address=f("Louisville, KY"),
+            importer_name=f(None),
             country_of_origin=f(None),
             government_warning=f(CANONICAL_WARNING),
             warning_prefix_all_caps=True,
@@ -70,5 +71,6 @@ def get_vision_provider(settings: Settings | None = None) -> VisionProvider:
             model=settings.vision_model,
             max_tokens=settings.vision_max_tokens,
             timeout=settings.request_timeout,
+            max_retries=settings.max_retries,
         )
     raise ValueError(f"Unknown vision provider: {settings.vision_provider!r}")

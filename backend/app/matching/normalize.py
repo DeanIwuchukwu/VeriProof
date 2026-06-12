@@ -8,16 +8,22 @@ Pure functions, no I/O. These encode the "judgment" the engine needs: that
 from __future__ import annotations
 
 import re
+import unicodedata
 from difflib import SequenceMatcher
 
 _SMART_QUOTES = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"'})
 
 
+def fold_accents(s: str) -> str:
+    """Strip diacritics so 'Bärenjäger' == 'Barenjager', 'Château' == 'Chateau'."""
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
 def normalize_text(s: str | None) -> str:
-    """Lowercase, unify quotes, drop punctuation, collapse whitespace."""
+    """Fold accents, lowercase, unify quotes, drop punctuation, collapse whitespace."""
     if not s:
         return ""
-    s = s.translate(_SMART_QUOTES).lower()
+    s = fold_accents(s.translate(_SMART_QUOTES)).lower()
     s = re.sub(r"[^a-z0-9]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
@@ -55,6 +61,41 @@ def _is_token_subsequence(short: list[str], long: list[str]) -> bool:
     """True if all tokens of `short` appear in order within `long`."""
     it = iter(long)
     return all(tok in it for tok in short)
+
+
+# Role phrases, legal suffixes, and connectors that don't identify the company.
+_COMPANY_STOP = {
+    "imported", "import", "imports", "importer", "by", "exclusively", "sole",
+    "produced", "product", "bottled", "brewed", "distilled", "vinted", "made",
+    "distributed", "manufactured", "for", "and", "the", "of", "in", "at",
+    "co", "inc", "llc", "ltd", "corp", "company", "corporation", "incorporated",
+    "gmbh", "ag", "sa", "srl", "spa", "kg", "limited",
+}
+
+
+def _company_tokens(s: str | None) -> set[str]:
+    """Distinctive name tokens: drop role/legal words, address numbers, single letters."""
+    out: set[str] = set()
+    for t in normalize_text(s).split():
+        if t in _COMPANY_STOP or t.isdigit() or len(t) <= 1:
+            continue
+        out.add(t)
+    return out
+
+
+def company_match(a: str | None, b: str | None, threshold: float = 0.7) -> bool:
+    """Match producer/importer names by distinctive-token overlap.
+
+    Ignores role prefixes ("Imported by"), legal suffixes ("Co., Inc."), and address
+    noise so "Imported by Sidney Frank Importing Co. Inc. New Rochelle, N.Y." matches the
+    applicant "Sidney Frank Importing Co., Inc., 20 Cedar St, New Rochelle NY 10801".
+    A high fraction of the shorter name's distinctive tokens must appear in the other.
+    """
+    ta, tb = _company_tokens(a), _company_tokens(b)
+    if not ta or not tb:
+        return False
+    smaller = ta if len(ta) <= len(tb) else tb
+    return len(ta & tb) / len(smaller) >= threshold
 
 
 # ----- alcohol content ------------------------------------------------------

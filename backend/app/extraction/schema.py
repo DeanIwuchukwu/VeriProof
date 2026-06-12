@@ -32,6 +32,9 @@ class ExtractedLabel(BaseModel):
     net_contents: ExtractedField = Field(default_factory=ExtractedField)
     producer_name: ExtractedField = Field(default_factory=ExtractedField)
     producer_address: ExtractedField = Field(default_factory=ExtractedField)
+    # Imports often carry BOTH a producer/bottler and a separate importer; either may be
+    # the party named on the application (SPEC §4 — name∪DBA matching).
+    importer_name: ExtractedField = Field(default_factory=ExtractedField)
     country_of_origin: ExtractedField = Field(default_factory=ExtractedField)
     government_warning: ExtractedField = Field(default_factory=ExtractedField)
 

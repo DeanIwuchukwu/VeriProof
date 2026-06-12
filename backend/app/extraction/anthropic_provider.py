@@ -9,12 +9,37 @@ not deep reasoning.
 from __future__ import annotations
 
 import base64
+import json
 
 import anthropic
 
 from app.cola.models import LabelImage
 from app.extraction.provider import VisionProvider
 from app.extraction.schema import ExtractedLabel
+
+_TRUST_STORE_READY = False
+
+
+def _use_system_trust_store() -> None:
+    """Trust the OS certificate store for TLS.
+
+    Behind corporate/endpoint TLS interception (e.g. an SSL-inspecting proxy that
+    re-signs HTTPS with a private root CA), Python's bundled `certifi` store does not
+    contain that CA, so requests fail with CERTIFICATE_VERIFY_FAILED. The Windows/macOS
+    trust store does contain it. `truststore` routes verification through the OS store —
+    keeping verification ON, unlike the unsafe `verify=False` shortcut. Best-effort:
+    on machines without interception this is a harmless no-op.
+    """
+    global _TRUST_STORE_READY
+    if _TRUST_STORE_READY:
+        return
+    try:
+        import truststore
+
+        truststore.inject_into_ssl()
+    except Exception:  # noqa: BLE001 — fall back to certifi if unavailable
+        pass
+    _TRUST_STORE_READY = True
 
 _MEDIA_TYPES = {
     "jpeg": "image/jpeg",
@@ -32,33 +57,46 @@ SYSTEM_PROMPT = (
     "ONE product — treat them together and note which image each value came from."
 )
 
+# Each label field is reported as this object.
+_FIELD_SHAPE = '{"value": string|null, "present": boolean, "confidence": number 0..1, "source_image": int|null}'
+
 EXTRACTION_INSTRUCTIONS = (
-    "Extract the TTB label fields from the image(s) above into the required structure.\n\n"
-    "Rules:\n"
-    "- A field is present only if it visibly appears on a label. If absent, set present=false and value=null.\n"
-    "- brand_name: the brand / company name. fanciful_name: the specific product (fanciful) name, if distinct.\n"
-    "- class_type: the class/type designation exactly as printed (e.g. 'Kentucky Straight Bourbon Whiskey').\n"
-    "- alcohol_content: as printed, including proof if shown (e.g. '40% ALC./VOL.' or '45% Alc./Vol. (90 Proof)').\n"
-    "- net_contents: as printed (e.g. '750 mL', '50 ML').\n"
-    "- producer_name / producer_address: the bottler/producer/importer name and address as printed.\n"
-    "- country_of_origin: e.g. 'Product of France' / 'Imported from Germany'; null if none.\n"
-    "- government_warning: transcribe the warning text VERBATIM, preserving exact capitalization. "
-    "Set warning_prefix_all_caps=true ONLY if the 'GOVERNMENT WARNING:' prefix is in ALL CAPITAL letters. "
-    "warning_appears_bold is a best-effort visual judgment.\n"
-    "- image_quality: 'good' | 'fair' | 'low' based on legibility (angle, glare, blur). If you cannot "
-    "read fields reliably, say 'low' rather than guessing.\n"
-    "- confidence: 0..1 per field; source_image: the 0-based index of the image you read it from.\n"
-    "Transcribe what you see; do not normalize, translate, or correct the text."
+    "Read the TTB label field values from the image(s) above and return them as a single JSON object.\n\n"
+    "Output ONLY the JSON object — no markdown fences, no commentary before or after.\n\n"
+    "The JSON object must have exactly these keys:\n"
+    f'  "brand_name": {_FIELD_SHAPE},        (the brand / company name)\n'
+    f'  "fanciful_name": {_FIELD_SHAPE},      (the specific product / fanciful name, if distinct)\n'
+    f'  "class_type": {_FIELD_SHAPE},         (class/type designation exactly as printed)\n'
+    f'  "alcohol_content": {_FIELD_SHAPE},    (as printed, include proof if shown, e.g. "45% Alc./Vol. (90 Proof)")\n'
+    f'  "net_contents": {_FIELD_SHAPE},       (as printed, e.g. "750 mL")\n'
+    f'  "producer_name": {_FIELD_SHAPE},      (the "produced by"/"bottled by"/"brewed by" name as printed)\n'
+    f'  "producer_address": {_FIELD_SHAPE},   (its address as printed)\n'
+    f'  "importer_name": {_FIELD_SHAPE},      (U.S. importer after "Imported by"/"Imported exclusively by"/"Sole importer"; '
+    "for imports this is usually a DIFFERENT company from the foreign producer and is often in small print on the back — "
+    'look carefully; null if domestic)\n'
+    f'  "country_of_origin": {_FIELD_SHAPE},  (e.g. "Product of France"; null if none)\n'
+    f'  "government_warning": {_FIELD_SHAPE}, (the warning text transcribed VERBATIM, preserving exact capitalization)\n'
+    '  "warning_prefix_all_caps": boolean|null,  (true ONLY if "GOVERNMENT WARNING:" is in ALL CAPITAL letters)\n'
+    '  "warning_appears_bold": boolean|null,     (best-effort visual judgment)\n'
+    '  "image_quality": "good"|"fair"|"low",     ("low" if angle/glare/blur make fields unreadable)\n'
+    '  "overall_confidence": number 0..1\n\n'
+    "Rules: a field is present only if it visibly appears on a label; otherwise present=false, value=null. "
+    "Transcribe what you see — do not normalize, translate, or correct the text. Do not guess unreadable text."
 )
 
 
 class AnthropicVisionProvider(VisionProvider):
-    def __init__(self, api_key: str | None, model: str, max_tokens: int, timeout: float):
+    def __init__(
+        self, api_key: str | None, model: str, max_tokens: int, timeout: float, max_retries: int = 1
+    ):
         if not api_key:
             raise ValueError(
                 "ANTHROPIC_API_KEY is not set. Set it, or run with TTB_VISION_PROVIDER=fake for offline mode."
             )
-        self._client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
+        _use_system_trust_store()
+        self._client = anthropic.Anthropic(
+            api_key=api_key, timeout=timeout, max_retries=max_retries
+        )
         self._model = model
         self._max_tokens = max_tokens
 
@@ -82,16 +120,33 @@ class AnthropicVisionProvider(VisionProvider):
             )
         content.append({"type": "text", "text": EXTRACTION_INSTRUCTIONS})
 
-        message = self._client.messages.parse(
+        # Plain create + JSON-in-prompt (not output_config.format): the structured-output
+        # feature can hang behind TLS-inspecting proxies; this path is fast and portable.
+        message = self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
-            thinking={"type": "disabled"},
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": content}],
-            output_format=ExtractedLabel,
         )
-        result = message.parsed_output
+        text = "".join(b.text for b in message.content if b.type == "text")
+        data = _parse_json_object(text)
+        result = ExtractedLabel.model_validate(data)
         return _clamp_confidences(result)
+
+
+def _parse_json_object(text: str) -> dict:
+    """Extract the single JSON object from the model's reply.
+
+    Tolerates accidental markdown fences or stray prose by slicing from the first '{'
+    to the last '}'. Raises ValueError (→ friendly API error) if no JSON is present.
+    """
+    if not text or "{" not in text:
+        raise ValueError("The model did not return a readable result for this label.")
+    start, end = text.find("{"), text.rfind("}")
+    try:
+        return json.loads(text[start : end + 1])
+    except json.JSONDecodeError as e:
+        raise ValueError("The model's label reading could not be parsed as JSON.") from e
 
 
 def _clamp_confidences(label: ExtractedLabel) -> ExtractedLabel:
@@ -108,6 +163,7 @@ def _clamp_confidences(label: ExtractedLabel) -> ExtractedLabel:
         "net_contents",
         "producer_name",
         "producer_address",
+        "importer_name",
         "country_of_origin",
         "government_warning",
     ):

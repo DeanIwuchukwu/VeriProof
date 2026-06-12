@@ -45,6 +45,7 @@ def make_extracted(**over) -> ExtractedLabel:
         net_contents=ef("750 mL"),
         producer_name=ef("Old Tom Distillery"),
         producer_address=ef("Louisville, KY"),
+        importer_name=ef(None),
         country_of_origin=ef("Product of Scotland"),
         government_warning=ef(CANONICAL_WARNING),
         warning_prefix_all_caps=True,
@@ -79,6 +80,12 @@ def test_tc02_brand_matches_via_fanciful():
     assert "fanciful" in by_field(res, "brand_name").reason.lower()
 
 
+def test_brand_accent_insensitive():
+    # Bärenjäger case: label uses umlauts, application is ASCII uppercase — same brand.
+    res = ENGINE.verify(make_claimed(brand_name="BARENJAGER"), make_extracted(brand_name=ef("Bärenjäger")))
+    assert by_field(res, "brand_name").status == Status.PASS
+
+
 # --- TC-03: producer matched via DBA / trade name --------------------------
 
 def test_tc03_producer_matches_via_dba():
@@ -93,6 +100,33 @@ def test_tc03_producer_matches_via_dba():
     v = by_field(res, "producer_name")
     assert v.status == Status.PASS
     assert "dba" in v.reason.lower() or "trade name" in v.reason.lower()
+
+
+def test_producer_matches_via_importer():
+    # Bärenjäger case: label names the German bottler AND the importer (the applicant).
+    claimed = make_claimed(
+        applicant_name_address="SIDNEY FRANK IMPORTING CO., INC., 20 CEDAR ST, NEW ROCHELLE NY 10801",
+        source=ProductSource.IMPORTED,
+    )
+    # Realistic: 'Imported by' prefix + a different address than the application.
+    extracted = make_extracted(
+        producer_name=ef("Teucke & König Bärenfangfabrik"),
+        importer_name=ef("IMPORTED BY SIDNEY FRANK IMPORTING CO. INC. NEW ROCHELLE, N.Y."),
+    )
+    res = ENGINE.verify(claimed, extracted)
+    v = by_field(res, "producer_name")
+    assert v.status == Status.PASS
+    assert "importer" in v.reason.lower()
+
+
+def test_producer_distinct_company_does_not_match():
+    claimed = make_claimed(applicant_name_address="ACME BEVERAGE IMPORTS, INC., CHICAGO IL")
+    extracted = make_extracted(
+        producer_name=ef("Globex Distilling Company"),
+        importer_name=ef("Imported by Wonka Spirits LLC, New York NY"),
+    )
+    res = ENGINE.verify(claimed, extracted)
+    assert by_field(res, "producer_name").status == Status.FLAG
 
 
 # --- TC-04: class/type is advisory, never a FAIL ---------------------------
@@ -226,6 +260,7 @@ def test_extract_only_shows_info_not_false_verdicts():
     [
         ("STONE'S THROW", "Stone's Throw", True),
         ("Château Lafite", "Chateau  Lafite", True),
+        ("Bärenjäger", "BARENJAGER", True),
         ("Old Tom", "Completely Different", False),
     ],
 )

@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     # killed the prior vendor) outweighs maximal capability. Swap via env.
     vision_model: str = Field(default="claude-sonnet-4-6", alias="TTB_VISION_MODEL")
     vision_max_tokens: int = Field(default=2048, alias="TTB_VISION_MAX_TOKENS")
-    request_timeout: float = Field(default=30.0, alias="TTB_REQUEST_TIMEOUT")
+    # Generous enough for the one-time structured-output schema compile + any TLS-proxy
+    # overhead on the first call; warm calls are far quicker.
+    request_timeout: float = Field(default=60.0, alias="TTB_REQUEST_TIMEOUT")
+    # One retry on a transient blip, not the SDK default of 2 (avoids multiplying a slow call).
+    max_retries: int = Field(default=1, alias="TTB_MAX_RETRIES")
 
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
 
