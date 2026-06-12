@@ -1,12 +1,19 @@
 import { useMemo, useState } from "react";
-import type { BatchItem, BatchResponse, Status } from "../types";
+import type { BatchItem, BatchResponse } from "../types";
 import { Report } from "./Report";
 import { StatusPill } from "./StatusPill";
 
 type SortKey = "filename" | "brand_name" | "product_type" | "overall" | "processing_ms";
 type Filter = "ALL" | "PASS" | "FLAG" | "FAIL" | "ERROR";
 
-const OVERALL_RANK: Record<string, number> = { FAIL: 0, FLAG: 1, PASS: 2, INFO: 3, NOT_CHECKED: 4, ERROR: 5 };
+const OVERALL_RANK: Record<string, number> = {
+  FAIL: 0,
+  FLAG: 1,
+  PASS: 2,
+  INFO: 3,
+  NOT_CHECKED: 4,
+  ERROR: 5,
+};
 
 export function BatchResults({ data }: { data: BatchResponse }) {
   const [sortKey, setSortKey] = useState<SortKey>("overall");
@@ -41,7 +48,7 @@ export function BatchResults({ data }: { data: BatchResponse }) {
           <FilterChip label="Errors" n={s.ERROR} active={filter === "ERROR"} on={() => setFilter("ERROR")} tone="fail" />
         )}
         <button className="btn-secondary csv-btn" onClick={() => downloadCsv(data.items)}>
-          ⭳ Export CSV
+          Export CSV
         </button>
       </div>
 
@@ -63,7 +70,12 @@ export function BatchResults({ data }: { data: BatchResponse }) {
             const idx = data.items.indexOf(it);
             const expanded = open === idx;
             return (
-              <BatchRow key={`${it.filename}-${idx}`} it={it} expanded={expanded} onToggle={() => setOpen(expanded ? null : idx)} />
+              <BatchRow
+                key={`${it.filename}-${idx}`}
+                it={it}
+                expanded={expanded}
+                onToggle={() => setOpen(expanded ? null : idx)}
+              />
             );
           })}
         </tbody>
@@ -72,7 +84,15 @@ export function BatchResults({ data }: { data: BatchResponse }) {
   );
 }
 
-function BatchRow({ it, expanded, onToggle }: { it: BatchItem; expanded: boolean; onToggle: () => void }) {
+function BatchRow({
+  it,
+  expanded,
+  onToggle,
+}: {
+  it: BatchItem;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const drillable = !!it.result;
   return (
     <>
@@ -85,7 +105,7 @@ function BatchRow({ it, expanded, onToggle }: { it: BatchItem; expanded: boolean
               aria-label={expanded ? "Hide details" : "Show details"}
               onClick={onToggle}
             >
-              {expanded ? "▾" : "▸"}
+              {expanded ? "v" : ">"}
             </button>
           )}
         </td>
@@ -93,24 +113,32 @@ function BatchRow({ it, expanded, onToggle }: { it: BatchItem; expanded: boolean
           {it.filename}
           {it.ttb_id && <span className="ttb-sub">{it.ttb_id}</span>}
         </th>
-        <td>{it.brand_name ?? <span className="muted">—</span>}</td>
-        <td>{it.product_type ?? <span className="muted">—</span>}</td>
+        <td>{it.brand_name ?? <span className="muted">-</span>}</td>
+        <td>{it.product_type ?? <span className="muted">-</span>}</td>
         <td>
-          {it.error ? <StatusPill status="FAIL" /> : <StatusPill status={it.overall as Status} />}
+          <StatusPill status={it.overall} />
           {it.error && <p className="reason">{it.error}</p>}
         </td>
         <td className="counts">
-          {it.counts.pass > 0 && <span className="c-pass">{it.counts.pass}✓</span>}
-          {it.counts.flag > 0 && <span className="c-flag">{it.counts.flag}⚠</span>}
-          {it.counts.fail > 0 && <span className="c-fail">{it.counts.fail}✕</span>}
+          {it.counts.pass > 0 && <span className="c-pass">{it.counts.pass} PASS</span>}
+          {it.counts.flag > 0 && <span className="c-flag">{it.counts.flag} FLAG</span>}
+          {it.counts.fail > 0 && <span className="c-fail">{it.counts.fail} FAIL</span>}
         </td>
-        <td className="cell-time">{it.processing_ms != null ? `${(it.processing_ms / 1000).toFixed(1)}s` : "—"}</td>
+        <td className="cell-time">
+          {it.processing_ms != null ? `${(it.processing_ms / 1000).toFixed(1)}s` : "-"}
+        </td>
       </tr>
       {expanded && it.result && (
         <tr className="drill-row">
           <td colSpan={7}>
             <Report
-              data={{ result: it.result, claimed: it.claimed, images: [], form_version: it.form_version, provider: "" }}
+              data={{
+                result: it.result,
+                claimed: it.claimed,
+                images: [],
+                form_version: it.form_version,
+                provider: "",
+              }}
             />
           </td>
         </tr>
@@ -136,7 +164,7 @@ function SortHeader({
   return (
     <th scope="col" aria-sort={active ? (asc ? "ascending" : "descending") : "none"}>
       <button className="sort-btn" onClick={() => on(k)}>
-        {label} <span aria-hidden="true">{active ? (asc ? "▲" : "▼") : "⇅"}</span>
+        {label} <span aria-hidden="true">{active ? (asc ? "^" : "v") : "<>"}</span>
       </button>
     </th>
   );
@@ -156,7 +184,11 @@ function FilterChip({
   tone?: "pass" | "flag" | "fail";
 }) {
   return (
-    <button className={`filter-chip ${active ? "chip-active" : ""} ${tone ? `chip-${tone}` : ""}`} aria-pressed={active} onClick={on}>
+    <button
+      className={`filter-chip ${active ? "chip-active" : ""} ${tone ? `chip-${tone}` : ""}`}
+      aria-pressed={active}
+      onClick={on}
+    >
       {label} <strong>{n}</strong>
     </button>
   );
@@ -169,7 +201,18 @@ function cmp(a: BatchItem, b: BatchItem, key: SortKey): number {
 }
 
 function downloadCsv(items: BatchItem[]) {
-  const head = ["filename", "ttb_id", "brand_name", "product_type", "overall", "pass", "flag", "fail", "processing_ms", "error"];
+  const head = [
+    "filename",
+    "ttb_id",
+    "brand_name",
+    "product_type",
+    "overall",
+    "pass",
+    "flag",
+    "fail",
+    "processing_ms",
+    "error",
+  ];
   const esc = (v: unknown) => {
     const str = String(v ?? "");
     return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
@@ -177,7 +220,18 @@ function downloadCsv(items: BatchItem[]) {
   const lines = [head.join(",")];
   for (const it of items) {
     lines.push(
-      [it.filename, it.ttb_id, it.brand_name, it.product_type, it.overall, it.counts.pass, it.counts.flag, it.counts.fail, it.processing_ms, it.error]
+      [
+        it.filename,
+        it.ttb_id,
+        it.brand_name,
+        it.product_type,
+        it.overall,
+        it.counts.pass,
+        it.counts.flag,
+        it.counts.fail,
+        it.processing_ms,
+        it.error,
+      ]
         .map(esc)
         .join(","),
     );

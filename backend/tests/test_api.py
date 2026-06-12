@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.extraction.extractor import Extractor
-from app.extraction.provider import FakeVisionProvider
+from app.extraction.provider import FakeVisionProvider, VisionProvider
 from app.main import app, get_service
 from app.service import VerificationService
 
@@ -30,6 +30,11 @@ def _override_service():
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+class BrokenVisionProvider(VisionProvider):
+    def extract(self, images):
+        raise RuntimeError("vision backend unavailable")
 
 
 def test_health(client: TestClient):
@@ -64,6 +69,16 @@ def test_verify_cola_rejects_garbage(client: TestClient):
     assert "COLA record" in r.json()["detail"]
 
 
+def test_verify_cola_service_failure_returns_503(client: TestClient):
+    app.dependency_overrides[get_service] = lambda: VerificationService(
+        extractor=Extractor(provider=BrokenVisionProvider())
+    )
+    pdf = (COLA_DIR / "OMB No. 1513-0020.pdf").read_bytes()
+    r = client.post("/api/verify/cola", files={"file": ("cola.pdf", pdf, "application/pdf")})
+    assert r.status_code == 503
+    assert "parsed" in r.json()["detail"]
+
+
 def test_verify_manual_matching_passes(client: TestClient):
     # Claimed values aligned with the FakeVisionProvider's reading -> overall PASS.
     r = client.post(
@@ -92,6 +107,19 @@ def test_verify_manual_requires_image(client: TestClient):
     assert r.status_code == 422
 
 
+def test_verify_manual_service_failure_returns_503(client: TestClient):
+    app.dependency_overrides[get_service] = lambda: VerificationService(
+        extractor=Extractor(provider=BrokenVisionProvider())
+    )
+    r = client.post(
+        "/api/verify/manual",
+        data={"brand_name": "OLD TOM DISTILLERY"},
+        files={"images": ("label.png", b"fake-image-bytes", "image/png")},
+    )
+    assert r.status_code == 503
+    assert "could not be completed" in r.json()["detail"]
+
+
 def test_verify_batch_mixed(client: TestClient):
     pdf1 = (COLA_DIR / "OMB No. 1513-0020.pdf").read_bytes()
     pdf2 = (COLA_DIR / "OMB No. 1512-0092.pdf").read_bytes()
@@ -111,3 +139,16 @@ def test_verify_batch_mixed(client: TestClient):
     assert items["a.pdf"]["counts"]["pass"] >= 1
     assert items["bad.pdf"]["error"] is not None
     assert items["bad.pdf"]["result"] is None
+
+
+def test_verify_batch_service_failure_is_reported_as_error(client: TestClient):
+    app.dependency_overrides[get_service] = lambda: VerificationService(
+        extractor=Extractor(provider=BrokenVisionProvider())
+    )
+    pdf = (COLA_DIR / "OMB No. 1513-0020.pdf").read_bytes()
+    r = client.post("/api/verify/batch", files=[("files", ("a.pdf", pdf, "application/pdf"))])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["summary"]["ERROR"] == 1
+    assert body["items"][0]["overall"] == "ERROR"
+    assert "parsed" in body["items"][0]["error"]

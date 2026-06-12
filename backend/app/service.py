@@ -36,10 +36,15 @@ class VerificationService:
     def provider_name(self) -> str:
         return self._get_extractor().provider_name
 
+    def parse_cola(self, pdf_bytes: bytes) -> ColaRecord:
+        return self._parser.parse(pdf_bytes)
+
     def verify_cola(self, pdf_bytes: bytes) -> tuple[ColaRecord, VerificationResult]:
-        record = self._parser.parse(pdf_bytes)
-        result = self._run(record.claimed, record.label_images)
-        return record, result
+        record = self.parse_cola(pdf_bytes)
+        return record, self.verify_record(record)
+
+    def verify_record(self, record: ColaRecord) -> VerificationResult:
+        return self._run(record.claimed, record.label_images)
 
     def verify_manual(
         self, claimed: ClaimedFields, images: list[LabelImage]

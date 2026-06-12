@@ -10,7 +10,6 @@ const EMPTY: ManualFields = {
   alcohol_content: "",
   class_type: "",
   producer: "",
-  country_of_origin: "",
 };
 
 export function ManualForm({
@@ -78,7 +77,6 @@ export function ManualForm({
         {text("net_contents", "Net contents", "e.g. 750 mL (comma-separate sizes)")}
         {text("class_type", "Class / type", "e.g. Bourbon Whiskey")}
         {text("producer", "Producer / bottler")}
-        {text("country_of_origin", "Country of origin (imports)")}
       </div>
 
       <div className="field-group">

@@ -56,13 +56,20 @@ async def verify_cola(
     if not data:
         raise HTTPException(status_code=422, detail="The uploaded file is empty.")
     try:
-        record, result = service.verify_cola(data)
-    except ValueError as e:  # provider misconfig (e.g. missing key)
-        raise HTTPException(status_code=503, detail=str(e)) from e
+        record = service.parse_cola(data)
     except Exception as e:  # noqa: BLE001 — never leak a stack trace to the client
         raise HTTPException(
             status_code=422,
             detail=f"Could not read this COLA record. Is it a valid TTB 5100.31 PDF? ({type(e).__name__})",
+        ) from e
+    try:
+        result = service.verify_record(record)
+    except ValueError as e:  # provider misconfig (e.g. missing key)
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001 — operational failure after a successful parse
+        raise HTTPException(
+            status_code=503,
+            detail=f"The COLA record was parsed, but verification could not be completed ({type(e).__name__}). Please try again.",
         ) from e
     return JSONResponse(_response(record, result, service.provider_name))
 
@@ -78,7 +85,6 @@ async def verify_manual(
     alcohol_content: str | None = Form(None),
     class_type: str | None = Form(None),
     producer: str | None = Form(None),
-    country_of_origin: str | None = Form(None),
     service: VerificationService = Depends(get_service),
 ) -> JSONResponse:
     label_images = []
@@ -102,15 +108,16 @@ async def verify_manual(
         applicant_name_address=_clean(producer),
         dba_tradename=None,
     )
-    # Country claimed manually is folded into the producer/source logic; the label-side
-    # country check is regulatory and needs no claimed value.
+    # Country of origin is verified from Source (imported) + the label, not a claimed value,
+    # so there is no manual country field to collect here.
     try:
         result = service.verify_manual(claimed, label_images)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(
-            status_code=500, detail=f"Verification failed unexpectedly ({type(e).__name__})."
+            status_code=503,
+            detail=f"The label was uploaded, but verification could not be completed ({type(e).__name__}). Please try again.",
         ) from e
     return JSONResponse(_response(None, result, service.provider_name, claimed=claimed))
 
@@ -142,12 +149,19 @@ async def verify_batch(
             if not data:
                 return _batch_error(name, "The file is empty.")
             try:
-                record, result = await asyncio.to_thread(service.verify_cola, data)
+                record = await asyncio.to_thread(service.parse_cola, data)
+            except Exception as e:  # noqa: BLE001
+                return _batch_error(name, f"Could not read this COLA record ({type(e).__name__}).")
+            try:
+                result = await asyncio.to_thread(service.verify_record, record)
                 return _batch_item(name, record, result)
             except ValueError as e:  # provider misconfig (e.g. missing key)
                 return _batch_error(name, str(e))
             except Exception as e:  # noqa: BLE001
-                return _batch_error(name, f"Could not read this COLA record ({type(e).__name__}).")
+                return _batch_error(
+                    name,
+                    f"The COLA record was parsed, but verification could not be completed ({type(e).__name__}).",
+                )
 
     items = await asyncio.gather(*(run_one(n, d) for n, d in payloads))
     return JSONResponse({"items": items, "summary": _batch_summary(items)})
@@ -198,6 +212,7 @@ def _batch_summary(items: list[dict]) -> dict:
         key = it["overall"] if it["overall"] in summary else "ERROR"
         summary[key] = summary.get(key, 0) + 1
     return summary
+
 
 def _response(
     record: ColaRecord | None,

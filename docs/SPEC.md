@@ -131,8 +131,9 @@ The tool has **two co-equal input modes** (F1, F2) that feed one shared engine (
 
 ### F2 — Manual-entry verification mode (demo / ad-hoc / PRD-sample path)
 - A guided form with a **text field per claimed field** (Brand, Fanciful name, Class/Type, ABV,
-  Net contents, Producer/bottler, Source = domestic/imported, Country) **+ a label-image upload**
-  (one or more: front / back).
+  Net contents, Producer/bottler) plus a **Source = domestic/imported** selector **+ a label-image
+  upload** (one or more: front / back). Country of origin is *not* a manual field — it is a
+  regulatory, label-only check driven by Source (imported → the label must state a country).
 - **Verify** runs the same Extractor + MatchEngine + RulesEngine as F1 → identical field-by-field report.
 - Two sub-modes: values entered → full **comparison**; left blank → **extract-only** + the
   label-only regulatory checks (warning, required-field presence, proof).

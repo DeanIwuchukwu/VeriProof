@@ -1,6 +1,7 @@
 // Mirrors the backend response shape (app/main.py _response).
 
 export type Status = "PASS" | "FLAG" | "FAIL" | "INFO" | "NOT_CHECKED";
+export type DisplayStatus = Status | "ERROR";
 
 export interface FieldVerdict {
   field: string;
@@ -57,7 +58,7 @@ export interface BatchItem {
   ttb_id: string | null;
   brand_name: string | null;
   product_type: string | null;
-  overall: Status | "ERROR";
+  overall: DisplayStatus;
   processing_ms: number | null;
   counts: { pass: number; flag: number; fail: number };
   claimed: ClaimedFields | null;
@@ -79,5 +80,4 @@ export interface ManualFields {
   alcohol_content: string;
   class_type: string;
   producer: string;
-  country_of_origin: string;
 }
