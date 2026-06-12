@@ -19,8 +19,10 @@ class Settings(BaseSettings):
     #   "anthropic" — Claude vision (needs ANTHROPIC_API_KEY)
     #   "fake"      — deterministic stub for offline dev / tests (no network)
     vision_provider: str = Field(default="anthropic", alias="TTB_VISION_PROVIDER")
-    # Default to a FAST vision model: the <5s latency target (the constraint that
-    # killed the prior vendor) outweighs maximal capability. Swap via env.
+    # Sonnet is the accuracy/latency sweet spot. (Haiku was measured ~2x faster on simple
+    # labels but repeatably garbles small back-label text — producer/importer names — and
+    # was slower on hard labels, so it's not the default. The <5s target is met by the
+    # no-proxy deploy environment; the raw image read is ~2.5s.) Swap via env.
     vision_model: str = Field(default="claude-sonnet-4-6", alias="TTB_VISION_MODEL")
     vision_max_tokens: int = Field(default=2048, alias="TTB_VISION_MAX_TOKENS")
     # Generous enough for the one-time structured-output schema compile + any TLS-proxy

@@ -27,6 +27,10 @@ from .normalize import (
 from .verdict import FieldVerdict, Status, VerificationResult
 from .warning_text import check_warning
 
+# Below this read-confidence (and when image quality is not "good"), an incomplete warning
+# is treated as "couldn't verify" (FLAG) rather than a confident-read violation (FAIL).
+_WARNING_READ_CONFIDENCE = 0.85
+
 
 class MatchEngine:
     def verify(self, claimed: ClaimedFields, extracted: ExtractedLabel) -> VerificationResult:
@@ -244,12 +248,31 @@ class MatchEngine:
 
         if not wc.present:
             return _warn_verdict(Status.FAIL, ex, "Government warning statement not found on the label.")
-        if not wc.content_ok:
-            missing = ", ".join(wc.missing_clauses) or "wording differs from the required statement"
-            return _warn_verdict(Status.FAIL, ex, f"Government warning wording is non-compliant; missing/altered: {missing}.")
+        # Title-case "Government Warning" is a clearly-legible violation Jenny described.
         if wc.prefix_all_caps is False:
             return _warn_verdict(Status.FAIL, ex, "'GOVERNMENT WARNING:' must appear in capital letters; it does not.")
-        return _warn_verdict(Status.PASS, ex, f"Government warning present and matches the required statement{bold_note}.")
+        if wc.content_ok:
+            return _warn_verdict(Status.PASS, ex, f"Government warning present and matches the required statement{bold_note}.")
+
+        # Present + ALL-CAPS prefix but wording incomplete. Distinguish a confident read of
+        # an altered/incomplete warning (a real violation → FAIL) from text that simply could
+        # not be read exactly (stylized/curved/tiny → FLAG for a human), using the model's own
+        # read confidence and image quality.
+        missing = ", ".join(wc.missing_clauses) or "wording differs from the required statement"
+        confident_read = (
+            ex.government_warning.confidence >= _WARNING_READ_CONFIDENCE
+            and ex.image_quality == "good"
+        )
+        if confident_read:
+            return _warn_verdict(
+                Status.FAIL, ex,
+                f"Government warning wording is non-compliant (text was clearly legible); missing/altered: {missing}.",
+            )
+        return _warn_verdict(
+            Status.FLAG, ex,
+            "Government warning is present but its exact wording could not be fully verified — "
+            f"likely stylized, curved, or low-resolution text. Recommend a manual check. Unclear: {missing}.",
+        )
 
     def _apply_image_quality_guard(self, result: VerificationResult, ex: ExtractedLabel) -> None:
         """Low image quality must never read as a confident PASS (SPEC F6, TC-13)."""

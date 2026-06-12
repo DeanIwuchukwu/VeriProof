@@ -171,6 +171,21 @@ def test_tc07_warning_read_correctly_passes():
     assert by_field(res, "government_warning").status == Status.PASS
 
 
+def test_warning_unverifiable_stylized_flags():
+    # Radial keg-collar case: present, ALL-CAPS prefix, but read with low confidence on
+    # stylized text → FLAG for human review, NOT a hard FAIL (which would be a false fail).
+    garbled = CANONICAL_WARNING.replace(" because of the risk of birth defects", "")
+    extracted = make_extracted(
+        government_warning=ExtractedField(value=garbled, present=True, confidence=0.55),
+        warning_prefix_all_caps=True,
+        image_quality="fair",
+    )
+    res = ENGINE.verify(make_claimed(), extracted)
+    v = by_field(res, "government_warning")
+    assert v.status == Status.FLAG
+    assert "manual" in v.reason.lower()
+
+
 # --- TC-08: proof != 2 x ABV -> FLAG ---------------------------------------
 
 def test_tc08_proof_inconsistent_flags():

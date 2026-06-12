@@ -81,7 +81,10 @@ EXTRACTION_INSTRUCTIONS = (
     '  "image_quality": "good"|"fair"|"low",     ("low" if angle/glare/blur make fields unreadable)\n'
     '  "overall_confidence": number 0..1\n\n'
     "Rules: a field is present only if it visibly appears on a label; otherwise present=false, value=null. "
-    "Transcribe what you see — do not normalize, translate, or correct the text. Do not guess unreadable text."
+    "Transcribe what you see — do not normalize, translate, or correct the text. Do not guess unreadable text. "
+    "For government_warning specifically: if it is printed curved/rotated/radially (e.g. around a keg "
+    "collar), in very small print, or is otherwise hard to read, set its confidence below 0.8 to reflect "
+    "that you may not have transcribed every word exactly."
 )
 
 

@@ -27,7 +27,7 @@ cover everything the stakeholders asked for?"
 | **F4.4** | ABV numeric parse + tolerance + proof = 2×ABV cross-check | DATA:all; CFR:5 | MatchEngine | 3.6 | TC-08, TC-09 | **Tested** |
 | **F4.5** | Net contents: unit-normalize; label value ∈ form's allowed-size set | DATA:11262001000022 (375/750/1L), DATA:11364001000181 (keg gal.) | MatchEngine | 3.7 | TC-10 | **Tested** |
 | **F4.6** | Country of origin required iff Source = Imported | DATA:all (imported vs domestic) | MatchEngine, RulesEngine | 3.8 | TC-11 | **Tested** |
-| **F4.7** | Government Warning: strict 27 CFR §16.21 text, `GOVERNMENT WARNING:` present + ALL-CAPS, across all images | INT:Jenny; CFR:16.21; DATA:all | MatchEngine | 3.9 | TC-05, TC-06, TC-07 | **Tested** |
+| **F4.7** | Government Warning: strict 27 CFR §16.21 text, ALL-CAPS prefix, across all images; confident-read violation → FAIL, present-but-unverifiable (stylized/curved/low-conf) → FLAG for review | INT:Jenny; CFR:16.21; DATA:all (radial keg collar) | MatchEngine | 3.9 | TC-05, TC-06, TC-07 + stylized-FLAG | **Tested** (incl. radial keg-collar → FLAG not false-FAIL) |
 | **F4.8** | Beverage-type-aware required-field rules (beer/wine/spirits/sake) | PRD (varies by type); DATA:all | RulesEngine | 3.10 | TC-12 | **Tested** |
 | **F5** | Batch verification: many records, concurrent, sortable table, CSV export | INT:Sarah/Janet (200–300 at peak) | Batch endpoint, dashboard | 5.1–5.4 | TC-14 | **Tested** (concurrent endpoint + dashboard, browser-verified on 3 real records) |
 | **F6** | Image robustness (angle/glare/rotation/radial/multilingual); low-confidence → friendly rescan message, never false PASS | INT:Jenny; DATA:11364001000181 (radial), DATA:13100001000426 (JP) | VisionProvider, Extractor, Report UI | 3.1, 4.5 | TC-07, TC-13 | **Built** (engine low-quality guard + report notice; real-image robustness at e2e) |
@@ -37,7 +37,7 @@ cover everything the stakeholders asked for?"
 
 | Req | Requirement | Source | Design component | WBS | Test | Status |
 |---|---|---|---|---|---|---|
-| **N1** | Single-record latency < 5 s end-to-end, displayed | INT:Sarah (vendor died at 30–40s) | Fast vision model, async | 3.1, 6.x | TC-15 | Planned |
+| **N1** | Single-record latency < 5 s end-to-end, displayed | INT:Sarah (vendor died at 30–40s) | Fast vision model, async | 3.1, 6.x | TC-15 | **In progress** — raw Sonnet image read ~2.5s; local times 9–12s are TLS-proxy-inflated; Haiku tested+rejected (garbles small text); <5s to be verified on no-proxy deploy |
 | **N2** | Usability for non-technical / 73-yr-old benchmark; large targets; no hunting | INT:Sarah | Frontend UX | 4.1, 4.5 | Manual UX review | **Built** (large targets, clean 2-mode flow, browser-verified) |
 | **N3** | Section 508 / WCAG 2.1 AA accessibility | Federal law; INT:Sarah | Frontend (a11y) | 4.1, 5.4 | a11y audit | **Built** (semantic HTML, ARIA tabs/live, visible focus, icon+text status; formal audit 6.7) |
 | **N4** | Stateless; no persistence of records/images/PII | INT:Marcus | All backend (in-memory) | 1.3, 3.x | Code review | **Built** (in-memory; nothing written to disk/db) |
