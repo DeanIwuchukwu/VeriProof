@@ -172,7 +172,7 @@ The tool has **two co-equal input modes** (F1, F2) that feed one shared engine (
 | N1 | Single-record latency | **< 5 s** end-to-end, displayed to user | Sarah (vendor failed at 30–40s) |
 | N2 | Usability | Non-technical, 50+/73-yr-old benchmark; large targets; no hunting for buttons | Sarah |
 | N3 | Accessibility | **Section 508 / WCAG 2.1 AA** — keyboard nav, screen-reader labels, contrast | Federal requirement + N2 |
-| N4 | Statelessness / privacy | No persistence of records, images, or PII; process in memory, discard | Marcus |
+| N4 | Storage / privacy | Persistence is opt-in: with `DATABASE_URL` set, verifications (claimed fields, results, original PDF) and reviewer decisions are stored for audit; unset → fully stateless (in-memory, discard). Label images are never stored separately (re-derivable from the PDF) | Marcus (evolved: audit trail added) |
 | N5 | Network resilience | Swappable provider; document on-prem/Azure path for firewalled prod | Marcus |
 | N6 | Robust errors | Clear, friendly messages; never a blank screen or raw stack trace | Eval: "UX and error handling" |
 
@@ -191,7 +191,8 @@ React/Vite SPA  ──HTTP──>  FastAPI (async)
                                     ├─ Extractor    (label image(s) -> structured JSON, schema-validated, multi-image)
                                     ├─ MatchEngine  (per-field strategies, pure + unit-tested)
                                     └─ RulesEngine  (beverage-type required fields)
-  Stateless: nothing written to disk/db.
+                                    └─ db (PostgreSQL)  verifications (+ original PDF) & decisions
+  Persistence is opt-in (DATABASE_URL); unset -> fully stateless.
 ```
 
 - **Backend:** Python + FastAPI, async (batch concurrency). Pydantic schemas for the vision contract

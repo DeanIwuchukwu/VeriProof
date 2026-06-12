@@ -40,7 +40,7 @@ cover everything the stakeholders asked for?"
 | **N1** | Single-record latency < 5 s end-to-end, displayed | INT:Sarah (vendor died at 30–40s) | Fast vision model, async | 3.1, 6.x | TC-15 | **In progress** — raw Sonnet image read ~2.5s; local times 9–12s are TLS-proxy-inflated; Haiku tested+rejected (garbles small text); <5s to be verified on no-proxy deploy |
 | **N2** | Usability for non-technical / 73-yr-old benchmark; large targets; no hunting | INT:Sarah | Frontend UX | 4.1, 4.5 | Manual UX review | **Built** (large targets, clean 2-mode flow, browser-verified) |
 | **N3** | Section 508 / WCAG 2.1 AA accessibility | Federal law; INT:Sarah | Frontend (a11y) | 4.1, 5.4 | a11y audit | **Built** (semantic HTML, ARIA tabs/live, visible focus, icon+text status; formal audit 6.7) |
-| **N4** | Stateless; no persistence of records/images/PII | INT:Marcus | All backend (in-memory) | 1.3, 3.x | Code review | **Built** (in-memory; nothing written to disk/db) |
+| **N4** | Storage opt-in: verifications (+ original PDF) and reviewer decisions persisted when `DATABASE_URL` is set; fully stateless when unset | INT:Marcus (evolved: audit trail added) | `app/db.py`, verify endpoints | 1.3, 3.x | test_persistence.py | **Built + tested** (PostgreSQL; append-only decisions; images not stored separately) |
 | **N5** | Network resilience: swappable provider; documented on-prem/Azure path | INT:Marcus (firewall) | VisionProvider interface | 2.3, 3.1 | Provider-swap test | **Tested** (anthropic/fake swap via env; provider-factory tests) |
 | **N6** | Robust, friendly errors; no blank screens or raw stack traces | PRD (UX & error handling) | API error layer, Report UI | 3.x, 4.4, 4.5 | TC-13 | **Built** (API error layer; UI pending) |
 
@@ -49,7 +49,7 @@ cover everything the stakeholders asked for?"
 | Item | Decision | Rationale / source |
 |---|---|---|
 | COLA system integration | Out | INT:Marcus (separate auth; "years away") |
-| Persistent storage / audit DB | Out | INT:Marcus (no sensitive storage for prototype) → N4 |
+| Persistent storage / audit DB | **Now in** (revised) | Added as the audit trail (verifications + decisions, N4); remains optional — unset `DATABASE_URL` restores full statelessness |
 | Auth / SSO | Out | Prototype scope |
 | Type size / CPI / contrast certification | Advisory only | DATA: records' own qualification — TTB does not review this at COLA |
 | Production FedRAMP hardening | Documented, not built | INT:Marcus (18-mo paperwork) |

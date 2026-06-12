@@ -51,10 +51,53 @@ export interface VerifyResponse {
   images: ImageMeta[];
   form_version: string | null;
   provider: string;
+  verification_id: string | null; // null when persistence is unavailable
+  prior_verifications: PriorVerification[]; // earlier runs of the same record (TTB ID / file hash)
+}
+
+export interface PriorVerification {
+  verification_id: string;
+  created_at: string | null;
+  overall: Status;
+  filename: string | null;
+  decision: Decision | null;
+}
+
+export type DecisionAction = "ACCEPT" | "REJECT";
+
+export interface Decision {
+  id: number;
+  action: DecisionAction;
+  note: string | null;
+  created_at: string;
+}
+
+/** Summary row from GET /api/verifications. */
+export interface HistoryItem {
+  verification_id: string;
+  created_at: string | null;
+  source: string;
+  filename: string | null;
+  ttb_id: string | null;
+  brand_name: string | null;
+  product_type: string | null;
+  overall: Status;
+  processing_ms: number | null;
+  has_pdf: boolean;
+  decision: Decision | null; // latest decision
+}
+
+/** Full record from GET /api/verifications/{id}. */
+export interface HistoryDetail extends Omit<HistoryItem, "decision"> {
+  claimed: ClaimedFields | null;
+  result: VerificationResult;
+  form_version: string | null;
+  decisions: Decision[];
 }
 
 export interface BatchItem {
   filename: string;
+  verification_id: string | null;
   error: string | null;
   ttb_id: string | null;
   brand_name: string | null;

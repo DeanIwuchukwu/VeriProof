@@ -1,8 +1,9 @@
 """Verification service — wires parsing, extraction, and matching into one call.
 
-Stateless: it holds no per-request data and persists nothing (SPEC N4). The vision
-provider is built lazily so the app starts even before a key is configured; a missing
-key surfaces as a clean error on first use, not a crash at import.
+The service itself holds no per-request state; persistence (verifications + reviewer
+decisions, SPEC N4) happens at the API layer via app/db.py. The vision provider is
+built lazily so the app starts even before a key is configured; a missing key
+surfaces as a clean error on first use, not a crash at import.
 """
 
 from __future__ import annotations

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import type { BatchItem, BatchResponse, DisplayStatus } from "../types";
+import { submitDecision } from "../api";
+import type { BatchItem, BatchResponse, DecisionAction, DisplayStatus } from "../types";
 import { ResultBody, StatusBadge, toFieldView } from "./reportViews";
 
 type Filter = "ALL" | DisplayStatus;
@@ -7,7 +8,37 @@ type Filter = "ALL" | DisplayStatus;
 export function BatchResultsPanel({ data }: { data: BatchResponse }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [open, setOpen] = useState<string | null>(null);
+  // Decisions saved this session, keyed by verification_id (server keeps the record).
+  const [decided, setDecided] = useState<Record<string, DecisionAction>>({});
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
   const s = data.summary;
+
+  async function decide(it: BatchItem, action: DecisionAction) {
+    const id = it.verification_id;
+    if (!id || busyIds.has(id)) return;
+    setError(null);
+    setBusyIds((b) => new Set(b).add(id));
+    try {
+      await submitDecision(id, action);
+      setDecided((d) => ({ ...d, [id]: action }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the decision.");
+    } finally {
+      setBusyIds((b) => {
+        const next = new Set(b);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function acceptAllPassing(items: BatchItem[]) {
+    const targets = items.filter(
+      (it) => it.overall === "PASS" && it.verification_id && !decided[it.verification_id],
+    );
+    await Promise.all(targets.map((it) => decide(it, "ACCEPT")));
+  }
 
   const tone = s.FAIL || s.ERROR ? "fail" : s.FLAG ? "flag" : "";
   const title =
@@ -83,13 +114,23 @@ export function BatchResultsPanel({ data }: { data: BatchResponse }) {
             it={it}
             open={open === it.filename}
             onToggle={() => setOpen(open === it.filename ? null : it.filename)}
+            decision={it.verification_id ? (decided[it.verification_id] ?? null) : null}
+            busy={!!it.verification_id && busyIds.has(it.verification_id)}
+            onDecide={(action) => decide(it, action)}
           />
         ))}
-        {anyPass && (
+        {(anyPass || error) && (
           <div className="batch-foot">
-            <button type="button" className="btn-accept" onClick={() => {}}>
-              ✓ Accept All (Pass)
-            </button>
+            {error && (
+              <span className="decision-error" role="alert">
+                {error}
+              </span>
+            )}
+            {anyPass && (
+              <button type="button" className="btn-accept" onClick={() => acceptAllPassing(rows)}>
+                ✓ Accept All (Pass)
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -101,12 +142,19 @@ function BatchRow({
   it,
   open,
   onToggle,
+  decision,
+  busy,
+  onDecide,
 }: {
   it: BatchItem;
   open: boolean;
   onToggle: () => void;
+  decision: DecisionAction | null;
+  busy: boolean;
+  onDecide: (action: DecisionAction) => void;
 }) {
   const drillable = !!it.result;
+  const canDecide = !!it.verification_id;
   return (
     <>
       <div
@@ -128,16 +176,33 @@ function BatchRow({
           {it.processing_ms != null ? `${(it.processing_ms / 1000).toFixed(1)}s` : "—"}
         </span>
         <span className="batch-actions" onClick={(e) => e.stopPropagation()}>
-          {!it.error && (
-            <>
-              <button type="button" className="btn-reject btn-mini" onClick={() => {}}>
-                Reject
-              </button>
-              <button type="button" className="btn-accept btn-mini" onClick={() => {}}>
-                Accept
-              </button>
-            </>
-          )}
+          {!it.error &&
+            (decision ? (
+              <span className={`saved-chip ${decision === "ACCEPT" ? "accept" : "reject"}`} role="status">
+                {decision === "ACCEPT" ? "✓ Accepted" : "✕ Rejected"}
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn-reject btn-mini"
+                  disabled={busy || !canDecide}
+                  title={canDecide ? undefined : "Saving is unavailable (database not configured)"}
+                  onClick={() => onDecide("REJECT")}
+                >
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  className="btn-accept btn-mini"
+                  disabled={busy || !canDecide}
+                  title={canDecide ? undefined : "Saving is unavailable (database not configured)"}
+                  onClick={() => onDecide("ACCEPT")}
+                >
+                  {busy ? "…" : "Accept"}
+                </button>
+              </>
+            ))}
         </span>
       </div>
       {open && it.result && (

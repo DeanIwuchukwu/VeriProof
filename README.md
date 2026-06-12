@@ -24,7 +24,11 @@ auto-approves or auto-rejects.
      results table, per-row drill-in, and CSV export.
 - **Assistive & accessible.** Color-coded results (status by icon **+** text **+** color), read
   confidence, processing-time badge, plain-English reasons, keyboard/screen-reader friendly
-  (Section 508-minded). Stateless — nothing is persisted.
+  (Section 508-minded).
+- **Saved verifications & reviewer decisions.** Each verification (claimed fields, results, and the
+  original COLA PDF) is stored in PostgreSQL, and reviewers can Accept/Reject with a note —
+  recorded append-only as an audit trail. Optional: with no `DATABASE_URL` configured the app runs
+  fully stateless (nothing persisted).
 
 ### Verified on the real sample records
 
@@ -75,7 +79,8 @@ React/Vite SPA  ──HTTP──>  FastAPI (async)
                              ├─ Extractor      label image(s) -> structured fields
                              ├─ MatchEngine    per-field strategies (pure, unit-tested)
                              └─ RulesEngine    beverage-type required-field rules
-  Stateless — nothing written to disk or a database.
+                             └─ db (PostgreSQL)  verifications (+ original PDF) & reviewer decisions
+  Persistence is optional: without DATABASE_URL the app runs fully stateless.
 ```
 
 The **vision provider is swappable behind an interface** (one env var). This is the design answer to
@@ -154,8 +159,10 @@ cd ../frontend && npx tsc --noEmit                            # frontend typeche
 - **The COLA record carries both sides of the comparison.** Application fields and label images travel
   together in the 5100.31, so agents type nothing in the primary flow. Manual entry is the secondary
   path for ad-hoc checks and the brief's sample fields.
-- **Stateless prototype.** No persistence, auth, or COLA-system integration (all explicitly out of
-  scope per the brief). Records and images are processed in memory and discarded.
+- **Persistence is opt-in; no auth.** With `DATABASE_URL` set, verifications (incl. the original
+  PDF) and reviewer decisions are stored (PostgreSQL); without it the app is fully stateless.
+  Decisions are anonymous (no login system) and append-only. COLA-system integration remains out
+  of scope per the brief.
 - **Latency.** The raw vision read is ~2.5s; end-to-end on a normal network targets the brief's <5s.
   On a machine behind a **TLS-inspecting proxy** (as the dev machine was) times are inflated to ~8–9s
   — an environment artifact, not the product. `truststore` is included so such proxies don't break TLS.

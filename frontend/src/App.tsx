@@ -3,19 +3,38 @@ import { verifyBatch, verifyCola, verifyManual } from "./api";
 import { BatchResultsPanel } from "./components/BatchResultsPanel";
 import { BatchUpload } from "./components/BatchUpload";
 import { ColaUpload } from "./components/ColaUpload";
+import { HistoryPanel } from "./components/HistoryPanel";
 import { LabelPreview, type PreviewImage } from "./components/LabelPreview";
 import { ManualForm } from "./components/ManualForm";
 import { ResultsPanel } from "./components/ResultsPanel";
 import type { Density } from "./components/reportViews";
 import type { BatchResponse, ManualFields, VerifyResponse } from "./types";
 
-type Mode = "upload" | "manual" | "batch";
+type Mode = "upload" | "manual" | "batch" | "history";
 
 const TABS: { id: Mode; label: string }[] = [
   { id: "upload", label: "Upload COLA" },
   { id: "manual", label: "Manual entry" },
   { id: "batch", label: "Batch" },
 ];
+
+const HistoryIcon = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 3v5h5" />
+    <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+    <path d="M12 7v5l4 2" />
+  </svg>
+);
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("upload");
@@ -26,6 +45,8 @@ export default function App() {
   const [batch, setBatch] = useState<BatchResponse | null>(null);
   const [manualFiles, setManualFiles] = useState<File[]>([]);
   const [manualUrls, setManualUrls] = useState<string[]>([]);
+  // Bumped per verification run; keys the results panels so decision state resets.
+  const [runSeq, setRunSeq] = useState(0);
 
   // Object URLs for previewing manually-attached images (no backend bytes for manual mode).
   useEffect(() => {
@@ -52,6 +73,7 @@ export default function App() {
     setError(null);
     setResult(null);
     setBatch(null);
+    setRunSeq((n) => n + 1);
   }
 
   async function run(fn: () => Promise<VerifyResponse>) {
@@ -112,6 +134,18 @@ export default function App() {
                 {t.label}
               </button>
             ))}
+            <button
+              id="tab-history"
+              role="tab"
+              aria-selected={mode === "history"}
+              aria-controls="input-panel"
+              aria-label="History — saved verifications"
+              title="History — saved verifications"
+              className={`tab tab-icon ${mode === "history" ? "active" : ""}`}
+              onClick={() => switchMode("history")}
+            >
+              <HistoryIcon />
+            </button>
           </div>
           <div className="panel-body" id="input-panel" role="tabpanel" aria-labelledby={`tab-${mode}`}>
             {mode === "upload" && <ColaUpload busy={busy} onVerify={(file) => run(() => verifyCola(file))} />}
@@ -125,6 +159,12 @@ export default function App() {
               />
             )}
             {mode === "batch" && <BatchUpload busy={busy} onVerify={runBatch} />}
+            {mode === "history" && (
+              <p className="desc">
+                Saved verifications and reviewer decisions — click a row on the right for the full
+                report. Records verified from a COLA keep their original PDF.
+              </p>
+            )}
 
             {mode !== "batch" && previewImages.length > 0 && <LabelPreview images={previewImages} />}
 
@@ -137,7 +177,9 @@ export default function App() {
 
         {/* Results panel */}
         <section className="panel" aria-label="Verification results">
-          {busy ? (
+          {mode === "history" ? (
+            <HistoryPanel />
+          ) : busy ? (
             <div className="panel-state">
               <div className="spinner" aria-hidden="true" />
               <span className="panel-state-title">
@@ -153,9 +195,9 @@ export default function App() {
               <span className="panel-state-sub">{error}</span>
             </div>
           ) : batch ? (
-            <BatchResultsPanel data={batch} />
+            <BatchResultsPanel key={runSeq} data={batch} />
           ) : result ? (
-            <ResultsPanel data={result} density={density} onDensity={setDensity} />
+            <ResultsPanel key={runSeq} data={result} density={density} onDensity={setDensity} />
           ) : (
             <div className="panel-state">
               <span className="panel-state-title">No record verified yet</span>

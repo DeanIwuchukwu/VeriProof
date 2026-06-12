@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
 
+    # Persistence. Railway injects DATABASE_URL; locally it lives in backend/.env.
+    # When unset the app still runs — verifications are just not saved (see app/db.py).
+    database_url: str | None = Field(default=None, alias="DATABASE_URL")
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -3,29 +3,43 @@
   POST /api/verify/cola    — input mode 1: upload a COLA record (PDF)
   POST /api/verify/manual  — input mode 2: claimed fields + label image(s)
 
-Stateless; nothing is persisted. Errors are returned as friendly JSON, never raw
-stack traces (SPEC N6).
+Each verification is saved (claimed fields, results, and the original COLA PDF), and
+reviewer decisions (accept/reject + note) are recorded append-only — see app/db.py.
+Errors are returned as friendly JSON, never raw stack traces (SPEC N6).
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+from contextlib import asynccontextmanager
 from functools import lru_cache
+from typing import Literal
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 
+from app import db
 from app.cola.models import ClaimedFields, ColaRecord, LabelImage, ProductSource, ProductType
 from app.config import get_settings
 from app.matching.verdict import VerificationResult
 from app.service import VerificationService
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    db.init_db()  # warns and disables persistence when DATABASE_URL is unset
+    yield
+
+
 app = FastAPI(
     title="TTB Label Verification",
     version="0.1.0",
     description="AI-assisted verification of alcohol-beverage labels against COLA application data.",
+    lifespan=_lifespan,
 )
 
 app.add_middleware(
@@ -72,7 +86,17 @@ async def verify_cola(
             status_code=503,
             detail=f"The COLA record was parsed, but verification could not be completed ({type(e).__name__}). Please try again.",
         ) from e
-    return JSONResponse(_response(record, result, service.provider_name))
+    # Link repeat uploads: find earlier runs of this record (by TTB ID or exact file
+    # hash) BEFORE saving the new one, so the reviewer sees prior decisions.
+    sha = hashlib.sha256(data).hexdigest()
+    prior = await asyncio.to_thread(db.find_prior, record.claimed.ttb_id, sha)
+    vid = await asyncio.to_thread(
+        db.save_verification,
+        source="upload", result=result, record=record, filename=file.filename, pdf=data,
+    )
+    return JSONResponse(
+        _response(record, result, service.provider_name, verification_id=vid, prior=prior)
+    )
 
 
 @app.post("/api/verify/manual")
@@ -120,7 +144,12 @@ async def verify_manual(
             status_code=503,
             detail=f"The label was uploaded, but verification could not be completed ({type(e).__name__}). Please try again.",
         ) from e
-    return JSONResponse(_response(None, result, service.provider_name, claimed=claimed))
+    vid = await asyncio.to_thread(
+        db.save_verification, source="manual", result=result, claimed=claimed,
+    )
+    return JSONResponse(
+        _response(None, result, service.provider_name, claimed=claimed, verification_id=vid)
+    )
 
 
 @app.post("/api/verify/batch")
@@ -155,7 +184,11 @@ async def verify_batch(
                 return _batch_error(name, f"Could not read this COLA record ({type(e).__name__}).")
             try:
                 result = await asyncio.to_thread(service.verify_record, record)
-                return _batch_item(name, record, result)
+                vid = await asyncio.to_thread(
+                    db.save_verification,
+                    source="batch", result=result, record=record, filename=name, pdf=data,
+                )
+                return _batch_item(name, record, result, verification_id=vid)
             except ValueError as e:  # provider misconfig (e.g. missing key)
                 return _batch_error(name, str(e))
             except Exception as e:  # noqa: BLE001
@@ -170,7 +203,9 @@ async def verify_batch(
 
 # ----- helpers --------------------------------------------------------------
 
-def _batch_item(name: str, record: ColaRecord, result: VerificationResult) -> dict:
+def _batch_item(
+    name: str, record: ColaRecord, result: VerificationResult, verification_id: str | None = None
+) -> dict:
     counts = {"pass": 0, "flag": 0, "fail": 0}
     for f in result.fields:
         key = f.status.value.lower()
@@ -178,6 +213,7 @@ def _batch_item(name: str, record: ColaRecord, result: VerificationResult) -> di
             counts[key] += 1
     return {
         "filename": name,
+        "verification_id": verification_id,
         "error": None,
         "ttb_id": record.claimed.ttb_id,
         "brand_name": record.claimed.brand_name,
@@ -194,6 +230,7 @@ def _batch_item(name: str, record: ColaRecord, result: VerificationResult) -> di
 def _batch_error(name: str, message: str) -> dict:
     return {
         "filename": name,
+        "verification_id": None,
         "error": message,
         "ttb_id": None,
         "brand_name": None,
@@ -220,6 +257,8 @@ def _response(
     result: VerificationResult,
     provider: str,
     claimed: ClaimedFields | None = None,
+    verification_id: str | None = None,
+    prior: list[dict] | None = None,
 ) -> dict:
     claimed_fields = record.claimed if record else claimed
     # Single-record responses carry the extracted label image(s) inline (base64 data URI) so the
@@ -244,7 +283,77 @@ def _response(
         "images": images_meta,
         "form_version": record.form_version if record else None,
         "provider": provider,
+        "verification_id": verification_id,
+        "prior_verifications": prior or [],
     }
+
+
+# ----- saved verifications & reviewer decisions ------------------------------
+
+class DecisionIn(BaseModel):
+    action: Literal["ACCEPT", "REJECT"]
+    note: str | None = None
+
+
+def _require_db() -> None:
+    if not db.enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Persistence is not configured (DATABASE_URL is unset).",
+        )
+
+
+@app.post("/api/verifications/{verification_id}/decision")
+async def submit_decision(verification_id: str, body: DecisionIn) -> JSONResponse:
+    """Record a reviewer decision (append-only; the latest decision wins for display)."""
+    _require_db()
+    row = await asyncio.to_thread(db.add_decision, verification_id, body.action, _clean(body.note))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Verification not found.")
+    return JSONResponse(row)
+
+
+@app.get("/api/verifications")
+async def list_verifications(limit: int = 50, offset: int = 0) -> JSONResponse:
+    _require_db()
+    items = await asyncio.to_thread(
+        db.list_verifications, min(max(limit, 1), 200), max(offset, 0)
+    )
+    return JSONResponse({"items": items})
+
+
+@app.get("/api/verifications/{verification_id}")
+async def get_verification(verification_id: str) -> JSONResponse:
+    _require_db()
+    record = await asyncio.to_thread(db.get_verification, verification_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Verification not found.")
+    return JSONResponse(record)
+
+
+@app.delete("/api/verifications/{verification_id}")
+async def delete_verification(verification_id: str) -> Response:
+    """Remove a saved verification and its decisions from history (hard delete)."""
+    _require_db()
+    ok = await asyncio.to_thread(db.delete_verification, verification_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Verification not found.")
+    return Response(status_code=204)
+
+
+@app.get("/api/verifications/{verification_id}/pdf")
+async def get_verification_pdf(verification_id: str) -> Response:
+    """The original COLA PDF as uploaded (manual entries have none)."""
+    _require_db()
+    stored = await asyncio.to_thread(db.get_pdf, verification_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="No stored PDF for this verification.")
+    data, filename = stored
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename or "record.pdf"}"'},
+    )
 
 
 _IMG_MIME = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}

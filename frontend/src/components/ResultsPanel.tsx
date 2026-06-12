@@ -1,4 +1,7 @@
-import type { VerifyResponse } from "../types";
+import { useState } from "react";
+import { submitDecision } from "../api";
+import type { DecisionAction, VerifyResponse } from "../types";
+import { fmtDate } from "./HistoryPanel";
 import {
   bannerInfo,
   DensitySwitch,
@@ -19,7 +22,26 @@ export function ResultsPanel({
   const fields = data.result.fields.map(toFieldView);
   const { tone, title, summary } = bannerInfo(data.result);
   const ms = data.result.processing_ms;
-  const images = data.images.map((i) => i.image_type || "label").join(", ");
+
+  const [note, setNote] = useState("");
+  const [saved, setSaved] = useState<DecisionAction | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canDecide = !!data.verification_id;
+
+  async function decide(action: DecisionAction) {
+    if (!data.verification_id) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await submitDecision(data.verification_id, action, note.trim() || undefined);
+      setSaved(action);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the decision.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <>
@@ -35,6 +57,31 @@ export function ResultsPanel({
         <DensitySwitch density={density} onDensity={onDensity} />
       </div>
 
+      {data.prior_verifications.length > 0 && (
+        <div className="prior-banner" role="note">
+          <span aria-hidden="true">↻</span>
+          <span>
+            Previously verified {fmtDate(data.prior_verifications[0].created_at)}
+            {data.prior_verifications[0].decision ? (
+              <>
+                {" — "}
+                <strong>
+                  {data.prior_verifications[0].decision.action === "ACCEPT" ? "✓ Accepted" : "✕ Rejected"}
+                </strong>
+                {data.prior_verifications[0].decision.note && (
+                  <> (“{data.prior_verifications[0].decision.note}”)</>
+                )}
+              </>
+            ) : (
+              " — no decision was recorded"
+            )}
+            {data.prior_verifications.length > 1 &&
+              ` · ${data.prior_verifications.length - 1} more earlier run${data.prior_verifications.length > 2 ? "s" : ""}`}
+            {" — see History"}
+          </span>
+        </div>
+      )}
+
       <div className="results-body">
         <ResultBody fields={fields} density={density} />
       </div>
@@ -46,38 +93,46 @@ export function ResultsPanel({
           className="decision-note"
           placeholder="Add a note (optional)…"
           aria-label="Agent decision note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          disabled={saved !== null}
         />
-        <button type="button" className="btn-reject" onClick={() => {}}>
-          ✕ Reject
-        </button>
-        <button type="button" className="btn-accept" onClick={() => {}}>
-          ✓ Accept
-        </button>
-      </div>
-
-      <div className="meta-footer">
-        {data.claimed?.ttb_id && (
-          <span className="meta-stack">
-            <span className="meta-label">TTB ID</span>
-            <span className="meta-val">{data.claimed.ttb_id}</span>
+        {error && (
+          <span className="decision-error" role="alert">
+            {error}
           </span>
         )}
-        {images && (
-          <span className="meta-stack">
-            <span className="meta-label">LABEL IMAGES</span>
-            <span className="meta-val">{images}</span>
-          </span>
+        {saved ? (
+          <>
+            <span className={`saved-chip ${saved === "ACCEPT" ? "accept" : "reject"}`} role="status">
+              {saved === "ACCEPT" ? "✓ Accepted — saved" : "✕ Rejected — saved"}
+            </span>
+            <button type="button" className="chip-change" onClick={() => setSaved(null)}>
+              Change
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn-reject"
+              disabled={saving || !canDecide}
+              title={canDecide ? undefined : "Saving is unavailable (database not configured)"}
+              onClick={() => decide("REJECT")}
+            >
+              ✕ Reject
+            </button>
+            <button
+              type="button"
+              className="btn-accept"
+              disabled={saving || !canDecide}
+              title={canDecide ? undefined : "Saving is unavailable (database not configured)"}
+              onClick={() => decide("ACCEPT")}
+            >
+              {saving ? "Saving…" : "✓ Accept"}
+            </button>
+          </>
         )}
-        {data.form_version && (
-          <span className="meta-stack">
-            <span className="meta-label">FORM</span>
-            <span className="meta-val">{data.form_version}</span>
-          </span>
-        )}
-        <span className="meta-disclaimer">
-          Type size, characters-per-inch, and contrasting-background checks are outside COLA
-          certification scope and not evaluated here.
-        </span>
       </div>
     </>
   );

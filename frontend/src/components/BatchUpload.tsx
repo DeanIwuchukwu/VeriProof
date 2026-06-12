@@ -28,7 +28,7 @@ export function BatchUpload({ onVerify, busy }: { onVerify: (files: File[]) => v
         <span className="dropzone-main">
           <strong className="dropzone-strong">Add COLA PDFs</strong> or drag them here
         </span>
-        <span className="dropzone-sub">Up to 50 records per batch</span>
+        <span className="dropzone-sub">Up to 400 records per batch</span>
       </button>
       <input
         ref={inputRef}
