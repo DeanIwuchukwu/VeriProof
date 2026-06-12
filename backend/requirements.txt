@@ -8,3 +8,6 @@ python-multipart>=0.0.20
 # COLA record parsing (PDF text layer + embedded image extraction)
 PyMuPDF>=1.25       # primary: text + image extraction
 pypdf>=5.1          # fallback: pure-Python text extraction
+
+# Vision extraction (swappable provider — default Anthropic)
+anthropic>=0.69

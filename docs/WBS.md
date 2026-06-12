@@ -12,7 +12,7 @@ in [SPEC.md §8](SPEC.md)) that verify it. Top-level packages follow the build o
 ## 1.0 Project foundation
 - **1.1** `[x]` Initialize git repo (`main`); `.gitignore`, branch strategy — *F-deliverable* (GitLab remote pending)
 - **1.2** `[x]` Repo layout: `backend/` (app/cola, tests), `docs/`, `ColaData/` — *code quality*
-- **1.3** `[~]` Stateless config + secrets via env (`.gitignore` done; `.env.example`/config module pending) — *N4, N5*
+- **1.3** `[x]` Stateless config + secrets via env (`.gitignore`, `.env.example`, `app/config.py` pydantic-settings) — *N4, N5*
 - **1.4** `[x]` Backend toolchain (FastAPI, Pydantic, PyMuPDF, pytest, ruff) on Python 3.14 — frontend toolchain pending
 - **1.5** `[ ]` CI: lint + unit tests on push — *code quality*
 
@@ -25,19 +25,19 @@ in [SPEC.md §8](SPEC.md)) that verify it. Top-level packages follow the build o
 - **2.4** `[x]` Parser unit tests against all 5 real `/ColaData` records (11 tests green) — *F1* → TC-01 ✓
 
 ## 3.0 Verification core (Extractor + MatchEngine + RulesEngine)
-- **3.1** `[ ]` `VisionProvider` interface + default fast cloud vision LLM; image preprocessing/sizing for <5s — *F3, N1, N5* → TC-15
-- **3.2** `[ ]` `Extractor`: label image(s) → structured JSON (schema-validated), multi-image aggregation — *F3* → TC-01, TC-07
-- **3.3** `[ ]` Brand matcher — normalize + fuzzy vs {brand ∪ fanciful} — *F4.1* → TC-02
-- **3.4** `[ ]` Producer/bottler matcher — vs {legal name ∪ DBA/tradename} — *F4.2* → TC-03
-- **3.5** `[ ]` Class/type — semantic/advisory consistency (no string-equality) — *F4.3* → TC-04
-- **3.6** `[ ]` ABV matcher — numeric parse + tolerance + proof = 2×ABV cross-check — *F4.4* → TC-08, TC-09
-- **3.7** `[ ]` Net-contents matcher — unit normalize + allowed-set membership — *F4.5* → TC-10
-- **3.8** `[ ]` Country-of-origin matcher — required iff Imported — *F4.6* → TC-11
-- **3.9** `[ ]` Government-warning matcher — strict §16.21 text, ALL-CAPS prefix, across images — *F4.7* → TC-05, TC-06, TC-07
-- **3.10** `[ ]` `RulesEngine` — beverage-type required-field rules (beer/wine/spirits/sake) — *F4.8* → TC-12
-- **3.11** `[ ]` Verdict model (PASS/FLAG/FAIL + reason + confidence + source image) — *F7* → TC-01
-- **3.12** `[ ]` Engine unit-test suite (pure functions, TC-02…TC-12) — *F4* 
-- **3.13** `[ ]` `/verify` API endpoint (single record), friendly error layer — *F1, N6* → TC-13
+- **3.1** `[x]` `VisionProvider` interface + Anthropic provider (default `claude-sonnet-4-6`, swappable) + Fake provider for offline/tests — *F3, N1, N5* (image downscale preprocessing deferred — COLA images are small)
+- **3.2** `[x]` `Extractor`: label image(s) → structured `ExtractedLabel` via `messages.parse`, multi-image aggregation — *F3*
+- **3.3** `[x]` Brand matcher — normalize + fuzzy vs {brand ∪ fanciful} — *F4.1* → TC-02 ✓
+- **3.4** `[x]` Producer/bottler matcher — vs {legal name ∪ DBA/tradename} — *F4.2* → TC-03 ✓
+- **3.5** `[x]` Class/type — semantic/advisory consistency (no string-equality) — *F4.3* → TC-04 ✓
+- **3.6** `[x]` ABV matcher — numeric parse + tolerance + proof = 2×ABV cross-check — *F4.4* → TC-08, TC-09 ✓
+- **3.7** `[x]` Net-contents matcher — unit normalize + allowed-set membership — *F4.5* → TC-10 ✓
+- **3.8** `[x]` Country-of-origin matcher — required iff Imported — *F4.6* → TC-11 ✓
+- **3.9** `[x]` Government-warning matcher — strict §16.21 text, ALL-CAPS prefix, across images — *F4.7* → TC-05, TC-06, TC-07 ✓
+- **3.10** `[x]` `RulesEngine` — beverage-type required-field rules (beer/wine/spirits/sake) — *F4.8* → TC-12 ✓
+- **3.11** `[x]` Verdict model (PASS/FLAG/FAIL + reason + confidence + source image) + low-image-quality guard — *F7* → TC-13 ✓
+- **3.12** `[x]` Engine unit-test suite (20 tests, TC-02…TC-13 + extras) — *F4* ✓
+- **3.13** `[x]` `/verify/cola` + `/verify/manual` endpoints (both modes), friendly error layer, processing-time — *F1, F2, N6* ✓
 
 ## 4.0 Single-record UI (both input modes)
 - **4.1** `[ ]` App shell: clean, high-contrast, large-target, keyboard + screen-reader (Section 508) — *N2, N3*
@@ -74,7 +74,7 @@ build on a proven core.
 ## Milestones
 
 - **M1 — Reads real records:** ✅ **DONE** — parser extracts claimed fields (incl. checkbox type/source) + label images from all 5 real records; 11 unit tests green, ruff clean.
-- **M2 — Verifies correctly:** 3.x done; engine passes TC-02…TC-12 on real + hostile variants.
+- **M2 — Verifies correctly:** ✅ **DONE (engine)** — 3.x complete; engine passes TC-02…TC-13 on hostile variants (41 tests green, ruff clean); both API modes working with Fake provider. Real-image vision pass deferred to M5/e2e (needs API key).
 - **M3 — Usable single-record app:** 4.x done; <5 s, accessible, friendly errors (TC-13, TC-15).
 - **M4 — Batch:** 5.x done (TC-14).
 - **M5 — Delivered:** 6.x done; deployed URL, README, docs; full real-record + PRD-example pass.
