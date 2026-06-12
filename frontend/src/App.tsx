@@ -90,7 +90,7 @@ export default function App() {
         <div className="header-mono">TTB</div>
         <div>
           <div className="header-eyebrow">ALCOHOL AND TOBACCO TAX AND TRADE BUREAU</div>
-          <div className="header-title">Label Verification</div>
+          <h1 className="header-title">Label Verification</h1>
         </div>
         <div className="header-tagline">Check that a label matches its COLA application — in seconds.</div>
       </header>
@@ -102,8 +102,10 @@ export default function App() {
             {TABS.map((t) => (
               <button
                 key={t.id}
+                id={`tab-${t.id}`}
                 role="tab"
                 aria-selected={mode === t.id}
+                aria-controls="input-panel"
                 className={`tab ${mode === t.id ? "active" : ""}`}
                 onClick={() => switchMode(t.id)}
               >
@@ -111,7 +113,7 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div className="panel-body">
+          <div className="panel-body" id="input-panel" role="tabpanel" aria-labelledby={`tab-${mode}`}>
             {mode === "upload" && <ColaUpload busy={busy} onVerify={(file) => run(() => verifyCola(file))} />}
             {mode === "manual" && (
               <ManualForm

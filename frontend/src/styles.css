@@ -26,10 +26,10 @@
   --ink-5: #4a5b70;
   --muted: #51637a;
   --muted-2: #62748a;
-  --muted-3: #6b7c92;
-  --faint: #7a8aa0;
-  --faint-2: #8595a8;
-  --faint-3: #8e9db0;
+  --muted-3: #65758a;
+  --faint: #647183;
+  --faint-2: #667281;
+  --faint-3: #66717e;
 
   --pass-text: #1e6b33;
   --pass-text-dark: #1e5a2e;
@@ -44,7 +44,7 @@
   --info-bg: #e8f0fa;
   --info-border: #c3d6ef;
 
-  --amber-text: #8a6d1f;
+  --amber-text: #876a1e;
   --amber-bg: #fbf3dc;
   --amber-bg-2: #fdfbf4;
   --amber-border: #e5dcc3;
@@ -134,6 +134,7 @@ select {
   font-weight: 600;
 }
 .header-title {
+  margin: 0;
   font-size: 17px;
   font-weight: 700;
   color: #fff;
@@ -344,7 +345,7 @@ select {
 .field-group select {
   width: 100%;
   height: 34px;
-  border: 1px solid #c9d4e0;
+  border: 1px solid #8a929a;
   border-radius: 6px;
   padding: 0 10px;
   font-size: 13px;
@@ -860,6 +861,16 @@ select {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

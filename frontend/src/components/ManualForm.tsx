@@ -77,6 +77,7 @@ export function ManualForm({
           accept="image/*"
           multiple
           className="sr-only"
+          aria-label="Attach label image(s)"
           onChange={(e) => setImages(Array.from(e.target.files ?? []))}
         />
         {images.length > 0 && (

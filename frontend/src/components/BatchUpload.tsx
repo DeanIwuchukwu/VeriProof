@@ -36,6 +36,7 @@ export function BatchUpload({ onVerify, busy }: { onVerify: (files: File[]) => v
         accept="application/pdf,.pdf"
         multiple
         className="sr-only"
+        aria-label="Add COLA PDFs"
         onChange={(e) => add(e.target.files)}
       />
 

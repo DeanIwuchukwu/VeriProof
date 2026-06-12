@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface PreviewImage {
   src: string;
@@ -7,12 +7,38 @@ export interface PreviewImage {
 
 export function LabelPreview({ images }: { images: PreviewImage[] }) {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
+  // Esc to close, trap Tab inside the dialog, and restore focus to the trigger on close.
   useEffect(() => {
     if (openIdx === null) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenIdx(null);
+    const prev = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button, [tabindex]") ?? []);
+    focusables()[0]?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenIdx(null);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const f = focusables();
+      if (!f.length) return;
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      prev?.focus?.();
+    };
   }, [openIdx]);
 
   if (!images.length) return null;
@@ -36,6 +62,7 @@ export function LabelPreview({ images }: { images: PreviewImage[] }) {
 
       {openIdx !== null && (
         <div
+          ref={dialogRef}
           className="lightbox"
           role="dialog"
           aria-modal="true"

@@ -16,6 +16,7 @@ export function ColaUpload({ onVerify, busy }: { onVerify: (file: File) => void;
   const [expanded, setExpanded] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Object URL so the uploaded PDF can be previewed in the lightbox (browser-native viewer).
   useEffect(() => {
@@ -28,11 +29,36 @@ export function ColaUpload({ onVerify, busy }: { onVerify: (file: File) => void;
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  // Esc to close, trap Tab inside the dialog, and restore focus to the trigger on close.
   useEffect(() => {
     if (!expanded) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setExpanded(false);
+    const prev = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button, iframe, [tabindex]") ?? []);
+    focusables()[0]?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setExpanded(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const f = focusables();
+      if (!f.length) return;
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      prev?.focus?.();
+    };
   }, [expanded]);
 
   return (
@@ -63,6 +89,7 @@ export function ColaUpload({ onVerify, busy }: { onVerify: (file: File) => void;
         type="file"
         accept="application/pdf,.pdf"
         className="sr-only"
+        aria-label="Choose a COLA PDF"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
       />
 
@@ -81,6 +108,7 @@ export function ColaUpload({ onVerify, busy }: { onVerify: (file: File) => void;
           <button
             className="file-remove"
             title="Remove file"
+            aria-label="Remove file"
             onClick={() => {
               setFile(null);
               setExpanded(false);
@@ -97,6 +125,7 @@ export function ColaUpload({ onVerify, busy }: { onVerify: (file: File) => void;
 
       {expanded && fileUrl && (
         <div
+          ref={dialogRef}
           className="lightbox"
           role="dialog"
           aria-modal="true"
