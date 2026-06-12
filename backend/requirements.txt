@@ -1,0 +1,10 @@
+# Core API  (versions chosen for Python 3.14 wheel availability)
+fastapi>=0.115
+uvicorn[standard]>=0.34
+pydantic>=2.13
+pydantic-settings>=2.7
+python-multipart>=0.0.20
+
+# COLA record parsing (PDF text layer + embedded image extraction)
+PyMuPDF>=1.25       # primary: text + image extraction
+pypdf>=5.1          # fallback: pure-Python text extraction
