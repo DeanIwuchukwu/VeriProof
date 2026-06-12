@@ -25,7 +25,7 @@ in [SPEC.md §8](SPEC.md)) that verify it. Top-level packages follow the build o
 - **2.4** `[x]` Parser unit tests against all 5 real `/ColaData` records (11 tests green) — *F1* → TC-01 ✓
 
 ## 3.0 Verification core (Extractor + MatchEngine + RulesEngine)
-- **3.1** `[x]` `VisionProvider` interface + Anthropic provider (default `claude-sonnet-4-6`, swappable) + Fake provider for offline/tests — *F3, N1, N5* (image downscale preprocessing deferred — COLA images are small)
+- **3.1** `[x]` `VisionProvider` interface + OpenAI provider (default `gpt-5.4-mini`, swappable) + Anthropic + Fake providers for offline/tests — *F3, N1, N5* (image downscale preprocessing deferred — COLA images are small)
 - **3.2** `[x]` `Extractor`: label image(s) → structured `ExtractedLabel` via `messages.parse`, multi-image aggregation — *F3*
 - **3.3** `[x]` Brand matcher — normalize + fuzzy vs {brand ∪ fanciful} — *F4.1* → TC-02 ✓
 - **3.4** `[x]` Producer/bottler matcher — vs {legal name ∪ DBA/tradename} — *F4.2* → TC-03 ✓

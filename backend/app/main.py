@@ -10,6 +10,7 @@ stack traces (SPEC N6).
 from __future__ import annotations
 
 import asyncio
+import base64
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -221,6 +222,8 @@ def _response(
     claimed: ClaimedFields | None = None,
 ) -> dict:
     claimed_fields = record.claimed if record else claimed
+    # Single-record responses carry the extracted label image(s) inline (base64 data URI) so the
+    # UI can preview them. Batch responses deliberately omit bytes (see _batch_item).
     images_meta = (
         [
             {
@@ -228,6 +231,7 @@ def _response(
                 "actual_dimensions": im.actual_dimensions,
                 "width_px": im.width_px,
                 "height_px": im.height_px,
+                "data_uri": _data_uri(im.data, im.image_format) if im.data else None,
             }
             for im in record.label_images
         ]
@@ -241,6 +245,14 @@ def _response(
         "form_version": record.form_version if record else None,
         "provider": provider,
     }
+
+
+_IMG_MIME = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
+
+
+def _data_uri(data: bytes, image_format: str) -> str:
+    mime = _IMG_MIME.get((image_format or "").lower(), "jpeg")
+    return f"data:image/{mime};base64,{base64.b64encode(data).decode('ascii')}"
 
 
 def _clean(s: str | None) -> str | None:

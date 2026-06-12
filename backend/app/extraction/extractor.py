@@ -21,4 +21,12 @@ class Extractor:
         return self._provider.name
 
     def extract(self, images: list[LabelImage]) -> ExtractedLabel:
-        return self._provider.extract(images)
+        result = self._provider.extract(images)
+        # Net contents is the field most often missed on hard layouts (e.g. the small
+        # checkbox list on a circular keg collar). On a first-pass miss, spend ONE focused
+        # re-read to recover it before the engine reports it as not found.
+        if not (result.net_contents.present and result.net_contents.value):
+            retry = self._provider.extract_net_contents(images)
+            if retry.present and retry.value:
+                result.net_contents = retry
+        return result

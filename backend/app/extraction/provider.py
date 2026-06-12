@@ -1,9 +1,4 @@
-"""VisionProvider interface + factory.
-
-The interface is the seam that makes the AI swappable (SPEC N5). Concrete providers:
-Anthropic (default), a deterministic Fake (offline dev / tests). A local-OCR provider
-could be added here without touching the matching engine or the API.
-"""
+"""VisionProvider interface + factory."""
 
 from __future__ import annotations
 
@@ -15,10 +10,17 @@ from app.extraction.schema import ExtractedField, ExtractedLabel
 
 
 class VisionProvider(ABC):
-    """Reads label image(s) into a structured :class:`ExtractedLabel`."""
+    """Reads label image(s) into a structured ExtractedLabel."""
 
     @abstractmethod
     def extract(self, images: list[LabelImage]) -> ExtractedLabel: ...
+
+    def extract_net_contents(self, images: list[LabelImage]) -> ExtractedField:
+        """Focused re-read of just the net contents, to recover a first-pass miss.
+
+        Default is a no-op (no recovery); providers may override with a targeted call.
+        """
+        return ExtractedField()
 
     @property
     def name(self) -> str:
@@ -26,17 +28,15 @@ class VisionProvider(ABC):
 
 
 class FakeVisionProvider(VisionProvider):
-    """Deterministic stub so the app and its tests run without network or a key.
-
-    Returns a fixed, fully-compliant reading. Useful for wiring tests and local
-    demos; never used when a real key is configured.
-    """
+    """Deterministic stub so the app and its tests run without network or a key."""
 
     def extract(self, images: list[LabelImage]) -> ExtractedLabel:
         from app.matching.warning_text import CANONICAL_WARNING
 
         def f(value: str | None) -> ExtractedField:
-            return ExtractedField(value=value, present=value is not None, confidence=0.9, source_image=0)
+            return ExtractedField(
+                value=value, present=value is not None, confidence=0.9, source_image=0
+            )
 
         return ExtractedLabel(
             brand_name=f("OLD TOM DISTILLERY"),
@@ -62,8 +62,17 @@ def get_vision_provider(settings: Settings | None = None) -> VisionProvider:
     provider = settings.vision_provider.lower()
     if provider == "fake":
         return FakeVisionProvider()
+    if provider == "openai":
+        from app.extraction.openai_provider import OpenAIVisionProvider
+
+        return OpenAIVisionProvider(
+            api_key=settings.openai_api_key,
+            model=settings.vision_model,
+            max_tokens=settings.vision_max_tokens,
+            timeout=settings.request_timeout,
+            max_retries=settings.max_retries,
+        )
     if provider == "anthropic":
-        # Imported lazily so the package doesn't hard-require the SDK/key for `fake`.
         from app.extraction.anthropic_provider import AnthropicVisionProvider
 
         return AnthropicVisionProvider(

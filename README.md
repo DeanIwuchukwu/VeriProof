@@ -71,7 +71,7 @@ React/Vite SPA  ──HTTP──>  FastAPI (async)
   • manual form + image      • /api/verify/manual   (claimed fields + images)
   • batch dashboard          • /api/verify/batch    (concurrent, many records)
                              ├─ ColaParser    PDF form-layer fields + label images (PyMuPDF)
-                             ├─ VisionProvider  swappable: Anthropic (default) | Fake (offline)
+                             ├─ VisionProvider  swappable: OpenAI (default) | Anthropic | Fake (offline)
                              ├─ Extractor      label image(s) -> structured fields
                              ├─ MatchEngine    per-field strategies (pure, unit-tested)
                              └─ RulesEngine    beverage-type required-field rules
@@ -86,7 +86,7 @@ Azure OpenAI deployment, or a local OCR model without touching the matching engi
 
 ## Setup & run
 
-**Prerequisites:** Python 3.12+ (tested on 3.14), Node 18+, and an `ANTHROPIC_API_KEY`
+**Prerequisites:** Python 3.12+ (tested on 3.14), Node 18+, and an `OPENAI_API_KEY`
 (or run fully offline with the Fake provider — see below).
 
 ### 1. Backend
@@ -97,7 +97,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt   # Windows
 # source .venv/bin/activate && pip install -r requirements.txt # macOS/Linux
 
-cp .env.example .env        # then put your key in ANTHROPIC_API_KEY
+cp .env.example .env        # then put your key in OPENAI_API_KEY
 .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000
 ```
 
@@ -131,8 +131,9 @@ cd ../frontend && npx tsc --noEmit                            # frontend typeche
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `TTB_VISION_PROVIDER` | `anthropic` | `anthropic` or `fake` (offline) |
-| `TTB_VISION_MODEL` | `claude-sonnet-4-6` | swap to `claude-haiku-4-5` (faster, less accurate) or `claude-opus-4-8` |
+| `TTB_VISION_PROVIDER` | `openai` | `openai`, `anthropic`, or `fake` (offline) |
+| `TTB_VISION_MODEL` | `gpt-5.4-mini` | low-latency default; can also point at `gpt-5.4`, `claude-haiku-4-5`, or `claude-sonnet-4-6` |
+| `OPENAI_API_KEY` | — | required when provider is `openai` |
 | `ANTHROPIC_API_KEY` | — | required when provider is `anthropic` |
 | `TTB_BATCH_CONCURRENCY` | `5` | records verified in parallel per batch |
 | `TTB_REQUEST_TIMEOUT` | `60` | per-call timeout (seconds) |
@@ -141,10 +142,10 @@ cd ../frontend && npx tsc --noEmit                            # frontend typeche
 
 ## Tools used
 
-- **Backend:** Python · FastAPI · Pydantic · PyMuPDF (PDF text + image extraction) · Anthropic SDK ·
+- **Backend:** Python · FastAPI · Pydantic · PyMuPDF (PDF text + image extraction) · OpenAI SDK · Anthropic SDK ·
   `truststore` (use the OS trust store for TLS) · pytest · ruff.
 - **Frontend:** React · Vite · TypeScript · hand-written CSS design system (no UI framework).
-- **Vision:** a Claude vision model via structured prompt + Pydantic validation.
+- **Vision:** a low-latency vision model via structured prompt + Pydantic validation, defaulting to `gpt-5.4-mini`.
 
 ---
 

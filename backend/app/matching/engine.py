@@ -31,6 +31,10 @@ from .warning_text import check_warning
 # is treated as "couldn't verify" (FLAG) rather than a confident-read violation (FAIL).
 _WARNING_READ_CONFIDENCE = 0.85
 
+# Same idea for net contents: a size that doesn't match, read with low confidence (or off a
+# poor image), may be a misread — FLAG for a human rather than hard-FAIL on a shaky read.
+_NET_CONTENTS_READ_CONFIDENCE = 0.85
+
 
 class MatchEngine:
     def verify(self, claimed: ClaimedFields, extracted: ExtractedLabel) -> VerificationResult:
@@ -176,9 +180,22 @@ class MatchEngine:
                                 claimed=", ".join(claimed.net_contents), extracted=ex.net_contents.value,
                                 reason="Net contents matches an approved size.",
                                 confidence=ex.net_contents.confidence, source_image=ex.net_contents.source_image)
-        return FieldVerdict(field="net_contents", label="Net Contents", status=Status.FAIL,
-                            claimed=", ".join(claimed.net_contents), extracted=ex.net_contents.value,
-                            reason=f"Label net contents '{ex.net_contents.value}' is not among approved sizes ({', '.join(claimed.net_contents)}).",
+        # Present but not an approved size. A confident, clear read of a wrong size is a real
+        # violation (FAIL); a shaky read (low confidence or poor image) may be a misread, so FLAG
+        # for a human rather than auto-reject (mirrors the government-warning gating above).
+        approved = ", ".join(claimed.net_contents)
+        confident_read = (
+            ex.net_contents.confidence >= _NET_CONTENTS_READ_CONFIDENCE
+            and ex.image_quality == "good"
+        )
+        if confident_read:
+            return FieldVerdict(field="net_contents", label="Net Contents", status=Status.FAIL,
+                                claimed=approved, extracted=ex.net_contents.value,
+                                reason=f"Label net contents '{ex.net_contents.value}' is not among approved sizes ({approved}).",
+                                confidence=ex.net_contents.confidence, source_image=ex.net_contents.source_image)
+        return FieldVerdict(field="net_contents", label="Net Contents", status=Status.FLAG,
+                            claimed=approved, extracted=ex.net_contents.value,
+                            reason=f"Label net contents '{ex.net_contents.value}' doesn't match an approved size ({approved}), but the read was not fully confident — recommend a manual check.",
                             confidence=ex.net_contents.confidence, source_image=ex.net_contents.source_image)
 
     def _producer(self, claimed: ClaimedFields, ex: ExtractedLabel) -> FieldVerdict:
@@ -230,11 +247,26 @@ class MatchEngine:
                                 confidence=ex.country_of_origin.confidence)
         if claimed.source == ProductSource.DOMESTIC:
             return FieldVerdict(field="country_of_origin", label="Country of Origin", status=Status.INFO,
-                                extracted=ex.country_of_origin.value,
+                                claimed="Domestic", extracted=ex.country_of_origin.value,
                                 reason="Domestic product — country of origin not required.")
+        # No readable SOURCE OF PRODUCT field on the form (e.g. the older OMB 1512-0092 layout has
+        # none, or the checkbox didn't read). Fall back to inferring import status from the label.
+        if ex.country_of_origin.present and ex.country_of_origin.value:
+            return FieldVerdict(field="country_of_origin", label="Country of Origin", status=Status.PASS,
+                                extracted=ex.country_of_origin.value,
+                                reason="Country of origin shown on the label (the application form does not declare product source).",
+                                confidence=ex.country_of_origin.confidence,
+                                source_image=ex.country_of_origin.source_image)
+        if ex.importer_name.present and ex.importer_name.value:
+            return FieldVerdict(field="country_of_origin", label="Country of Origin", status=Status.FLAG,
+                                extracted=None,
+                                reason="Label names an importer (suggesting an imported product) but no country-of-origin "
+                                       "statement was found, and the form does not declare source — recommend a manual check.",
+                                confidence=ex.country_of_origin.confidence)
         return FieldVerdict(field="country_of_origin", label="Country of Origin", status=Status.NOT_CHECKED,
                             extracted=ex.country_of_origin.value,
-                            reason="Product source not determined; country-of-origin requirement not assessed.")
+                            reason="Could not determine product source — no source field on this form version "
+                                   "and no import indicators on the label.")
 
     def _warning(self, ex: ExtractedLabel) -> FieldVerdict:
         wc = check_warning(

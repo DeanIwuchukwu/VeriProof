@@ -1,52 +1,66 @@
-import { useId, useState } from "react";
+import { useRef, useState } from "react";
 
-export function BatchUpload({
-  onVerify,
-  busy,
-}: {
-  onVerify: (files: File[]) => void;
-  busy: boolean;
-}) {
+export function BatchUpload({ onVerify, busy }: { onVerify: (files: File[]) => void; busy: boolean }) {
   const [files, setFiles] = useState<File[]>([]);
-  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function add(list: FileList | null) {
+    if (list) setFiles(Array.from(list));
+  }
 
   return (
-    <form
-      className="panel"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (files.length) onVerify(files);
-      }}
-    >
-      <p className="panel-help">
-        Upload many COLA records at once (the peak-season case). Each is verified independently and
-        the results appear in a sortable table you can export.
+    <>
+      <p className="desc">
+        Drop multiple COLA PDFs — each record is verified independently and summarized in the panel
+        on the right.
       </p>
 
-      <div className="field-group">
-        <label htmlFor={inputId}>COLA record PDFs</label>
-        <input
-          id={inputId}
-          type="file"
-          accept="application/pdf,.pdf"
-          multiple
-          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-        />
-        {files.length > 0 && (
-          <p className="filename" aria-live="polite">
-            {files.length} record{files.length > 1 ? "s" : ""} selected
-          </p>
-        )}
-      </div>
-
-      <button type="submit" className="btn-primary" disabled={!files.length || busy}>
-        {busy ? `Verifying ${files.length} record${files.length > 1 ? "s" : ""}…` : "Verify all"}
+      <button
+        type="button"
+        className="dropzone"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          add(e.dataTransfer.files);
+        }}
+      >
+        <span className="dropzone-main">
+          <strong className="dropzone-strong">Add COLA PDFs</strong> or drag them here
+        </span>
+        <span className="dropzone-sub">Up to 50 records per batch</span>
       </button>
-      {busy && (
-        <p className="panel-help" role="status">
-          Large batches can take a while — each record is read by the AI in turn.
-        </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        multiple
+        className="sr-only"
+        onChange={(e) => add(e.target.files)}
+      />
+
+      {files.length > 0 && (
+        <div className="queue">
+          {files.map((f, i) => (
+            <div className="queue-row" key={`${f.name}-${i}`}>
+              <span className="pdf-chip">PDF</span>
+              <span className="queue-name" title={f.name}>
+                {f.name}
+              </span>
+              <span className="queue-chip" style={{ background: "var(--nc-bg)", color: "var(--nc-text)" }}>
+                {busy ? "Verifying…" : "Queued"}
+              </span>
+            </div>
+          ))}
+          <div className="queue-footer">
+            {files.length} record{files.length === 1 ? "" : "s"} queued
+          </div>
+        </div>
       )}
-    </form>
+
+      <button className="btn-primary" disabled={!files.length || busy} onClick={() => onVerify(files)}>
+        {busy ? `Verifying ${files.length}…` : `Verify queue (${files.length || 0})`}
+      </button>
+    </>
   );
 }

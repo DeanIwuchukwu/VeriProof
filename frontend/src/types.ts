@@ -42,6 +42,7 @@ export interface ImageMeta {
   actual_dimensions: string | null;
   width_px: number;
   height_px: number;
+  data_uri?: string | null;
 }
 
 export interface VerifyResponse {
@@ -74,10 +75,9 @@ export interface BatchResponse {
 export interface ManualFields {
   brand_name: string;
   fanciful_name: string;
-  product_type: string;
-  source: string;
-  net_contents: string;
-  alcohol_content: string;
   class_type: string;
+  source: string;
+  alcohol_content: string;
+  net_contents: string;
   producer: string;
 }

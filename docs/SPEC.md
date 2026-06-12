@@ -201,7 +201,7 @@ React/Vite SPA  ──HTTP──>  FastAPI (async)
   low-confidence. *Trade-off (documented): deterministic-by-keyword is fast/free but mildly brittle
   across form versions; LLM extraction is robust but adds a call — we default to deterministic with
   LLM fallback.*
-- **Vision:** `VisionProvider` interface; default = fast Claude vision model via env config.
+- **Vision:** `VisionProvider` interface; default = low-latency `gpt-5.4-mini` via env config.
   Swapping providers = one class + one env var. This answers Marcus's firewall problem in *design*.
 - **Frontend:** React + Vite. Minimal, high-contrast, large-target, accessible.
 - **Deploy:** Render/Railway/Fly. Secrets via env. Repo on **GitLab**.

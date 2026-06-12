@@ -11,6 +11,7 @@ pypdf>=5.1          # fallback: pure-Python text extraction
 
 # Vision extraction (swappable provider — default Anthropic)
 anthropic>=0.69
+openai>=1.99
 # Use the OS trust store for TLS so corporate/endpoint TLS-interception CAs are
 # trusted (certifi alone fails with CERTIFICATE_VERIFY_FAILED behind such proxies).
 truststore>=0.10

@@ -1,26 +1,52 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { verifyBatch, verifyCola, verifyManual } from "./api";
-import { BatchResults } from "./components/BatchResults";
+import { BatchResultsPanel } from "./components/BatchResultsPanel";
 import { BatchUpload } from "./components/BatchUpload";
 import { ColaUpload } from "./components/ColaUpload";
+import { LabelPreview, type PreviewImage } from "./components/LabelPreview";
 import { ManualForm } from "./components/ManualForm";
-import { Report } from "./components/Report";
+import { ResultsPanel } from "./components/ResultsPanel";
+import type { Density } from "./components/reportViews";
 import type { BatchResponse, ManualFields, VerifyResponse } from "./types";
 
-type Mode = "cola" | "manual" | "batch";
+type Mode = "upload" | "manual" | "batch";
 
 const TABS: { id: Mode; label: string }[] = [
-  { id: "cola", label: "Upload COLA record" },
-  { id: "manual", label: "Enter values manually" },
-  { id: "batch", label: "Batch (many records)" },
+  { id: "upload", label: "Upload COLA" },
+  { id: "manual", label: "Manual entry" },
+  { id: "batch", label: "Batch" },
 ];
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>("cola");
+  const [mode, setMode] = useState<Mode>("upload");
+  const [density, setDensity] = useState<Density>("table");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
   const [batch, setBatch] = useState<BatchResponse | null>(null);
+  const [manualFiles, setManualFiles] = useState<File[]>([]);
+  const [manualUrls, setManualUrls] = useState<string[]>([]);
+
+  // Object URLs for previewing manually-attached images (no backend bytes for manual mode).
+  useEffect(() => {
+    if (!manualFiles.length) {
+      setManualUrls([]);
+      return;
+    }
+    const urls = manualFiles.map((f) => URL.createObjectURL(f));
+    setManualUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [manualFiles]);
+
+  const previewImages: PreviewImage[] = useMemo(() => {
+    if (!result || mode === "batch") return [];
+    if (mode === "upload") {
+      return result.images
+        .filter((i) => i.data_uri)
+        .map((i) => ({ src: i.data_uri as string, caption: i.image_type }));
+    }
+    return manualUrls.map((u, i) => ({ src: u, caption: manualFiles[i]?.name ?? null }));
+  }, [result, mode, manualUrls, manualFiles]);
 
   function reset() {
     setError(null);
@@ -55,58 +81,90 @@ export default function App() {
   function switchMode(next: Mode) {
     setMode(next);
     reset();
+    setManualFiles([]);
   }
 
   return (
     <div className="app">
-      <header className="masthead">
-        <div className="masthead-inner">
-          <p className="agency">Alcohol and Tobacco Tax and Trade Bureau</p>
-          <h1>Label Verification</h1>
-          <p className="tagline">
-            Check that an alcohol-beverage label matches its COLA application — in seconds.
-          </p>
+      <header className="header">
+        <div className="header-mono">TTB</div>
+        <div>
+          <div className="header-eyebrow">ALCOHOL AND TOBACCO TAX AND TRADE BUREAU</div>
+          <div className="header-title">Label Verification</div>
         </div>
+        <div className="header-tagline">Check that a label matches its COLA application — in seconds.</div>
       </header>
 
-      <main className="container">
-        <div className="tabs" role="tablist" aria-label="Verification mode">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={mode === t.id}
-              className={`tab ${mode === t.id ? "tab-active" : ""}`}
-              onClick={() => switchMode(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <main className="main">
+        {/* Input panel */}
+        <section className="panel" aria-label="Verification input">
+          <div className="tabs" role="tablist" aria-label="Input mode">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={mode === t.id}
+                className={`tab ${mode === t.id ? "active" : ""}`}
+                onClick={() => switchMode(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="panel-body">
+            {mode === "upload" && <ColaUpload busy={busy} onVerify={(file) => run(() => verifyCola(file))} />}
+            {mode === "manual" && (
+              <ManualForm
+                busy={busy}
+                onVerify={(fields: ManualFields, images: File[]) => {
+                  setManualFiles(images);
+                  run(() => verifyManual(fields, images));
+                }}
+              />
+            )}
+            {mode === "batch" && <BatchUpload busy={busy} onVerify={runBatch} />}
 
-        {mode === "cola" && <ColaUpload busy={busy} onVerify={(file) => run(() => verifyCola(file))} />}
-        {mode === "manual" && (
-          <ManualForm
-            busy={busy}
-            onVerify={(fields: ManualFields, images: File[]) => run(() => verifyManual(fields, images))}
-          />
-        )}
-        {mode === "batch" && <BatchUpload busy={busy} onVerify={runBatch} />}
+            {mode !== "batch" && previewImages.length > 0 && <LabelPreview images={previewImages} />}
 
-        <div aria-live="polite">
-          {error && (
-            <p className="error" role="alert">
-              {error}
+            <p className="panel-note">
+              This tool assists review by flagging items for a human compliance agent — it does not
+              approve or reject applications.
             </p>
-          )}
-          {batch && <BatchResults data={batch} />}
-          {result && <Report data={result} />}
-        </div>
-      </main>
+          </div>
+        </section>
 
-      <footer className="footer">
-        Prototype — assistive tool for compliance review. No data is stored.
-      </footer>
+        {/* Results panel */}
+        <section className="panel" aria-label="Verification results">
+          {busy ? (
+            <div className="panel-state">
+              <div className="spinner" aria-hidden="true" />
+              <span className="panel-state-title">
+                {mode === "batch" ? "Verifying records…" : "Reading document…"}
+              </span>
+              <span className="panel-state-sub">
+                Extracting application fields and label images, then checking each field.
+              </span>
+            </div>
+          ) : error ? (
+            <div className="panel-state error" role="alert">
+              <span className="panel-state-title">Couldn’t complete verification</span>
+              <span className="panel-state-sub">{error}</span>
+            </div>
+          ) : batch ? (
+            <BatchResultsPanel data={batch} />
+          ) : result ? (
+            <ResultsPanel data={result} density={density} onDensity={setDensity} />
+          ) : (
+            <div className="panel-state">
+              <span className="panel-state-title">No record verified yet</span>
+              <span className="panel-state-sub">
+                Upload a COLA record, enter values manually, or run a batch to see the field-by-field
+                report here.
+              </span>
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
