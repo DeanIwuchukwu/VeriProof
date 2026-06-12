@@ -47,10 +47,10 @@ in [SPEC.md §8](SPEC.md)) that verify it. Top-level packages follow the build o
 - **4.5** `[x]` Report view: per-field rows (claimed vs label, verdict pill, reason, **read confidence**), overall banner, **processing-time badge**, low-quality notice, assistive disclaimer — *F6, F7, N1, N6* ✓ browser-verified
 
 ## 5.0 Batch verification
-- **5.1** `[ ]` `/verify/batch` endpoint — concurrent processing, rate-limit aware — *F5* → TC-14
-- **5.2** `[ ]` Multi-record upload (multi-select / zip) — *F5*
-- **5.3** `[ ]` Results dashboard: sortable/filterable table, per-item drill-in, CSV export — *F5* → TC-14
-- **5.4** `[ ]` Batch UI accessibility pass — *N3*
+- **5.1** `[x]` `/verify/batch` endpoint — concurrent (`asyncio.to_thread` + semaphore), per-record failure isolation, summary — *F5* → TC-14 ✓
+- **5.2** `[x]` Multi-record upload (multi-select) — *F5* ✓
+- **5.3** `[x]` Results dashboard: summary chips + status filter, sortable table, per-row drill-in (reuses Report), CSV export — *F5* → TC-14 ✓ browser-verified
+- **5.4** `[x]` Batch UI accessibility — semantic table, `aria-sort`, `aria-expanded`, `aria-pressed`, sr-only caption — *N3*
 
 ## 6.0 Test corpus, hardening, delivery
 - **6.1** `[ ]` Deploy to Render/Railway/Fly; public URL; env config — *deliverable*
@@ -76,5 +76,5 @@ build on a proven core.
 - **M1 — Reads real records:** ✅ **DONE** — parser extracts claimed fields (incl. checkbox type/source) + label images from all 5 real records; 11 unit tests green, ruff clean.
 - **M2 — Verifies correctly:** ✅ **DONE (engine)** — 3.x complete; engine passes TC-02…TC-13 on hostile variants (41 tests green, ruff clean); both API modes working with Fake provider. Real-image vision pass deferred to M5/e2e (needs API key).
 - **M3 — Usable single-record app:** ✅ **DONE (UI)** — both input modes + color-coded report browser-verified end-to-end (parse→extract→match→report), processing-time badge, read confidence, friendly errors, accessible by construction. Real-vision <5s latency (TC-15) + formal 508 audit (6.7) at M5.
-- **M4 — Batch:** 5.x done (TC-14).
+- **M4 — Batch:** ✅ **DONE** — 5.x complete; concurrent `/verify/batch`, sortable/filterable dashboard + drill-in + CSV export, browser-verified on 3 real records (all PASS, processed in parallel). 46 tests green.
 - **M5 — Delivered:** 6.x done; deployed URL, README, docs; full real-record + PRD-example pass.

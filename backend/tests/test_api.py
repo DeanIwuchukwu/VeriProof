@@ -90,3 +90,24 @@ def test_verify_manual_requires_image(client: TestClient):
         files={"images": ("empty.png", b"", "image/png")},
     )
     assert r.status_code == 422
+
+
+def test_verify_batch_mixed(client: TestClient):
+    pdf1 = (COLA_DIR / "OMB No. 1513-0020.pdf").read_bytes()
+    pdf2 = (COLA_DIR / "OMB No. 1512-0092.pdf").read_bytes()
+    files = [
+        ("files", ("a.pdf", pdf1, "application/pdf")),
+        ("files", ("b.pdf", pdf2, "application/pdf")),
+        ("files", ("bad.pdf", b"not a pdf", "application/pdf")),  # one bad file must not fail the batch
+    ]
+    r = client.post("/api/verify/batch", files=files)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["summary"]["total"] == 3
+    assert body["summary"]["ERROR"] == 1  # the bad file
+    items = {it["filename"]: it for it in body["items"]}
+    assert items["a.pdf"]["brand_name"] == "BARENJAGER"
+    assert items["a.pdf"]["result"]["overall"] in {"PASS", "FLAG", "FAIL"}
+    assert items["a.pdf"]["counts"]["pass"] >= 1
+    assert items["bad.pdf"]["error"] is not None
+    assert items["bad.pdf"]["result"] is None

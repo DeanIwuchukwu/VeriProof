@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     request_timeout: float = Field(default=60.0, alias="TTB_REQUEST_TIMEOUT")
     # One retry on a transient blip, not the SDK default of 2 (avoids multiplying a slow call).
     max_retries: int = Field(default=1, alias="TTB_MAX_RETRIES")
+    # Max records verified concurrently in a batch (balances throughput vs. provider rate limits).
+    batch_concurrency: int = Field(default=5, alias="TTB_BATCH_CONCURRENCY")
+    # Reject oversized batches outright (the peak-season case is ~200-300).
+    batch_max_files: int = Field(default=400, alias="TTB_BATCH_MAX_FILES")
 
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
 

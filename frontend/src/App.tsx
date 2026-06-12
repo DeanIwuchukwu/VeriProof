@@ -1,22 +1,36 @@
 import { useState } from "react";
-import { verifyCola, verifyManual } from "./api";
+import { verifyBatch, verifyCola, verifyManual } from "./api";
+import { BatchResults } from "./components/BatchResults";
+import { BatchUpload } from "./components/BatchUpload";
 import { ColaUpload } from "./components/ColaUpload";
 import { ManualForm } from "./components/ManualForm";
 import { Report } from "./components/Report";
-import type { ManualFields, VerifyResponse } from "./types";
+import type { BatchResponse, ManualFields, VerifyResponse } from "./types";
 
-type Mode = "cola" | "manual";
+type Mode = "cola" | "manual" | "batch";
+
+const TABS: { id: Mode; label: string }[] = [
+  { id: "cola", label: "Upload COLA record" },
+  { id: "manual", label: "Enter values manually" },
+  { id: "batch", label: "Batch (many records)" },
+];
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("cola");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResponse | null>(null);
+  const [batch, setBatch] = useState<BatchResponse | null>(null);
+
+  function reset() {
+    setError(null);
+    setResult(null);
+    setBatch(null);
+  }
 
   async function run(fn: () => Promise<VerifyResponse>) {
     setBusy(true);
-    setError(null);
-    setResult(null);
+    reset();
     try {
       setResult(await fn());
     } catch (e) {
@@ -26,10 +40,21 @@ export default function App() {
     }
   }
 
+  async function runBatch(files: File[]) {
+    setBusy(true);
+    reset();
+    try {
+      setBatch(await verifyBatch(files));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function switchMode(next: Mode) {
     setMode(next);
-    setError(null);
-    setResult(null);
+    reset();
   }
 
   return (
@@ -46,34 +71,27 @@ export default function App() {
 
       <main className="container">
         <div className="tabs" role="tablist" aria-label="Verification mode">
-          <button
-            role="tab"
-            aria-selected={mode === "cola"}
-            className={`tab ${mode === "cola" ? "tab-active" : ""}`}
-            onClick={() => switchMode("cola")}
-          >
-            Upload COLA record
-          </button>
-          <button
-            role="tab"
-            aria-selected={mode === "manual"}
-            className={`tab ${mode === "manual" ? "tab-active" : ""}`}
-            onClick={() => switchMode("manual")}
-          >
-            Enter values manually
-          </button>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={mode === t.id}
+              className={`tab ${mode === t.id ? "tab-active" : ""}`}
+              onClick={() => switchMode(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {mode === "cola" ? (
-          <ColaUpload busy={busy} onVerify={(file) => run(() => verifyCola(file))} />
-        ) : (
+        {mode === "cola" && <ColaUpload busy={busy} onVerify={(file) => run(() => verifyCola(file))} />}
+        {mode === "manual" && (
           <ManualForm
             busy={busy}
-            onVerify={(fields: ManualFields, images: File[]) =>
-              run(() => verifyManual(fields, images))
-            }
+            onVerify={(fields: ManualFields, images: File[]) => run(() => verifyManual(fields, images))}
           />
         )}
+        {mode === "batch" && <BatchUpload busy={busy} onVerify={runBatch} />}
 
         <div aria-live="polite">
           {error && (
@@ -81,6 +99,7 @@ export default function App() {
               {error}
             </p>
           )}
+          {batch && <BatchResults data={batch} />}
           {result && <Report data={result} />}
         </div>
       </main>

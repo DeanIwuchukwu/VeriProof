@@ -51,6 +51,25 @@ export interface VerifyResponse {
   provider: string;
 }
 
+export interface BatchItem {
+  filename: string;
+  error: string | null;
+  ttb_id: string | null;
+  brand_name: string | null;
+  product_type: string | null;
+  overall: Status | "ERROR";
+  processing_ms: number | null;
+  counts: { pass: number; flag: number; fail: number };
+  claimed: ClaimedFields | null;
+  result: VerificationResult | null;
+  form_version: string | null;
+}
+
+export interface BatchResponse {
+  items: BatchItem[];
+  summary: { total: number; PASS: number; FLAG: number; FAIL: number; ERROR: number };
+}
+
 export interface ManualFields {
   brand_name: string;
   fanciful_name: string;

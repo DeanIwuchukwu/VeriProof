@@ -403,6 +403,118 @@ body {
   padding: 0.9rem 1rem;
 }
 
+/* ---------- batch ---------- */
+.batch-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.filter-chip {
+  font-size: 0.95rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: #fff;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.filter-chip strong {
+  color: var(--ink);
+}
+.filter-chip.chip-active {
+  border-color: var(--accent);
+  background: #eef4fc;
+}
+.filter-chip.chip-pass strong {
+  color: var(--pass-fg);
+}
+.filter-chip.chip-flag strong {
+  color: var(--flag-fg);
+}
+.filter-chip.chip-fail strong {
+  color: var(--fail-fg);
+}
+.btn-secondary {
+  font-weight: 700;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 2px solid var(--accent);
+  background: #fff;
+  color: var(--accent);
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background: #eef4fc;
+}
+.csv-btn {
+  margin-left: auto;
+}
+.sort-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.batch-table th,
+.batch-table td {
+  padding: 0.7rem 0.6rem;
+}
+.cell-expand {
+  width: 2rem;
+}
+.expand-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--accent);
+  cursor: pointer;
+  line-height: 1;
+}
+.ttb-sub {
+  display: block;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.counts {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.counts span {
+  margin-right: 0.5rem;
+  font-weight: 700;
+}
+.c-pass {
+  color: var(--pass-fg);
+}
+.c-flag {
+  color: var(--flag-fg);
+}
+.c-fail {
+  color: var(--fail-fg);
+}
+.cell-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.row-open > * {
+  background: #f6f8fb;
+}
+.drill-row > td {
+  background: #f6f8fb;
+  padding: 0.5rem 0.5rem 1rem;
+}
+.drill-row .report {
+  margin-top: 0;
+}
+
 /* footer */
 .footer {
   text-align: center;

@@ -29,7 +29,7 @@ cover everything the stakeholders asked for?"
 | **F4.6** | Country of origin required iff Source = Imported | DATA:all (imported vs domestic) | MatchEngine, RulesEngine | 3.8 | TC-11 | **Tested** |
 | **F4.7** | Government Warning: strict 27 CFR §16.21 text, `GOVERNMENT WARNING:` present + ALL-CAPS, across all images | INT:Jenny; CFR:16.21; DATA:all | MatchEngine | 3.9 | TC-05, TC-06, TC-07 | **Tested** |
 | **F4.8** | Beverage-type-aware required-field rules (beer/wine/spirits/sake) | PRD (varies by type); DATA:all | RulesEngine | 3.10 | TC-12 | **Tested** |
-| **F5** | Batch verification: many records, concurrent, sortable table, CSV export | INT:Sarah/Janet (200–300 at peak) | Batch endpoint, dashboard | 4.3, 5.x | TC-14 | Planned |
+| **F5** | Batch verification: many records, concurrent, sortable table, CSV export | INT:Sarah/Janet (200–300 at peak) | Batch endpoint, dashboard | 5.1–5.4 | TC-14 | **Tested** (concurrent endpoint + dashboard, browser-verified on 3 real records) |
 | **F6** | Image robustness (angle/glare/rotation/radial/multilingual); low-confidence → friendly rescan message, never false PASS | INT:Jenny; DATA:11364001000181 (radial), DATA:13100001000426 (JP) | VisionProvider, Extractor, Report UI | 3.1, 4.5 | TC-07, TC-13 | **Built** (engine low-quality guard + report notice; real-image robustness at e2e) |
 | **F7** | Assistive framing: flags-for-review, confidence shown, reasoning visible, never auto-approve/reject | INT:Dave (judgment, don't make life harder) | MatchEngine output, Report UI | 3.3–3.10, 4.5 | TC-01, TC-09 | **Tested** (engine + UI: status pill, reason, read-confidence shown) |
 

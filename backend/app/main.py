@@ -9,6 +9,7 @@ stack traces (SPEC N6).
 
 from __future__ import annotations
 
+import asyncio
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -16,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.cola.models import ClaimedFields, ColaRecord, LabelImage, ProductSource, ProductType
+from app.config import get_settings
 from app.matching.verdict import VerificationResult
 from app.service import VerificationService
 
@@ -113,7 +115,89 @@ async def verify_manual(
     return JSONResponse(_response(None, result, service.provider_name, claimed=claimed))
 
 
+@app.post("/api/verify/batch")
+async def verify_batch(
+    files: list[UploadFile] = File(..., description="Multiple COLA record PDFs."),
+    service: VerificationService = Depends(get_service),
+) -> JSONResponse:
+    """Verify many COLA records concurrently (peak-season case: 200-300 at once).
+
+    Per-record failures are isolated — one unreadable file does not fail the batch.
+    Concurrency is bounded to respect the vision provider's rate limits.
+    """
+    settings = get_settings()
+    if len(files) > settings.batch_max_files:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Too many files ({len(files)}). The limit is {settings.batch_max_files} per batch.",
+        )
+    payloads = [(f.filename or "record.pdf", await f.read()) for f in files]
+    if not payloads:
+        raise HTTPException(status_code=422, detail="No files were uploaded.")
+
+    sem = asyncio.Semaphore(max(1, settings.batch_concurrency))
+
+    async def run_one(name: str, data: bytes) -> dict:
+        async with sem:
+            if not data:
+                return _batch_error(name, "The file is empty.")
+            try:
+                record, result = await asyncio.to_thread(service.verify_cola, data)
+                return _batch_item(name, record, result)
+            except ValueError as e:  # provider misconfig (e.g. missing key)
+                return _batch_error(name, str(e))
+            except Exception as e:  # noqa: BLE001
+                return _batch_error(name, f"Could not read this COLA record ({type(e).__name__}).")
+
+    items = await asyncio.gather(*(run_one(n, d) for n, d in payloads))
+    return JSONResponse({"items": items, "summary": _batch_summary(items)})
+
+
 # ----- helpers --------------------------------------------------------------
+
+def _batch_item(name: str, record: ColaRecord, result: VerificationResult) -> dict:
+    counts = {"pass": 0, "flag": 0, "fail": 0}
+    for f in result.fields:
+        key = f.status.value.lower()
+        if key in counts:
+            counts[key] += 1
+    return {
+        "filename": name,
+        "error": None,
+        "ttb_id": record.claimed.ttb_id,
+        "brand_name": record.claimed.brand_name,
+        "product_type": record.claimed.product_type.value,
+        "overall": result.overall.value,
+        "processing_ms": result.processing_ms,
+        "counts": counts,
+        "claimed": record.claimed.model_dump(),
+        "result": result.model_dump(),
+        "form_version": record.form_version,
+    }
+
+
+def _batch_error(name: str, message: str) -> dict:
+    return {
+        "filename": name,
+        "error": message,
+        "ttb_id": None,
+        "brand_name": None,
+        "product_type": None,
+        "overall": "ERROR",
+        "processing_ms": None,
+        "counts": {"pass": 0, "flag": 0, "fail": 0},
+        "claimed": None,
+        "result": None,
+        "form_version": None,
+    }
+
+
+def _batch_summary(items: list[dict]) -> dict:
+    summary = {"total": len(items), "PASS": 0, "FLAG": 0, "FAIL": 0, "ERROR": 0}
+    for it in items:
+        key = it["overall"] if it["overall"] in summary else "ERROR"
+        summary[key] = summary.get(key, 0) + 1
+    return summary
 
 def _response(
     record: ColaRecord | None,
