@@ -61,10 +61,10 @@ cover everything the stakeholders asked for?"
 | Deliverable | WBS | Status |
 |---|---|---|
 | Source repo on GitLab — all source | 1.1 | Planned |
-| README — setup & run instructions | 6.2 | Planned |
-| Approach / tools / assumptions doc | 6.3 | Planned |
+| README — setup & run instructions | 6.2 | **Built** (`README.md`) |
+| Approach / tools / assumptions doc | 6.3 | **Built** (README + SPEC) |
 | Deployed application URL | 6.1 | Planned |
-| Working prototype to test | 4.x, 5.x | Planned |
+| Working prototype to test | 4.x, 5.x | **Built** (runs locally; verified on all 5 real records) |
 | SPEC + RTM + WBS (beyond ask; completeness) | — | **Built** |
 
 ---

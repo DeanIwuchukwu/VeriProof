@@ -54,13 +54,13 @@ in [SPEC.md §8](SPEC.md)) that verify it. Top-level packages follow the build o
 
 ## 6.0 Test corpus, hardening, delivery
 - **6.1** `[ ]` Deploy to Render/Railway/Fly; public URL; env config — *deliverable*
-- **6.2** `[ ]` README — setup & run instructions — *deliverable*
-- **6.3** `[ ]` Approach / tools / assumptions / trade-offs doc — *deliverable*
-- **6.4** `[ ]` Build real + adversarial test corpus (hostile variants of real records); dev-time public-registry fetch utility — *F4, F6* → TC-02…TC-13
-- **6.5** `[ ]` Low-quality-image handling end-to-end — *F6* → TC-13
-- **6.6** `[ ]` Latency verification < 5 s on deployed app — *N1* → TC-15
-- **6.7** `[ ]` Section 508 / WCAG audit — *N3*
-- **6.8** `[ ]` End-to-end run against all 5 real records + PRD example on the deployed URL — *all*
+- **6.2** `[x]` README — setup & run instructions (`README.md`) — *deliverable*
+- **6.3** `[x]` Approach / tools / assumptions / trade-offs (README + `docs/SPEC.md`) — *deliverable*
+- **6.4** `[~]` Adversarial test corpus — hostile-variant **unit tests** done (TC-02…TC-13); generated hostile **image** set still pending — *F4, F6*
+- **6.5** `[x]` Low-quality-image handling — engine low-quality guard + warning FLAG for unverifiable text — *F6* → TC-13
+- **6.6** `[~]` Latency: raw read ~2.5s; local ~8–9s is TLS-proxy-inflated; <5s to verify on deploy — *N1* → TC-15
+- **6.7** `[ ]` Section 508 / WCAG formal audit (built accessible; audit pending) — *N3*
+- **6.8** `[~]` End-to-end run on all 5 real records — done locally (4 PASS, 1 correct FLAG); deployed run + PRD manual-entry example pending — *all*
 
 ---
 
