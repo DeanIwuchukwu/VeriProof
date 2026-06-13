@@ -40,21 +40,37 @@ class VerificationService:
     def parse_cola(self, pdf_bytes: bytes) -> ColaRecord:
         return self._parser.parse(pdf_bytes)
 
-    def verify_cola(self, pdf_bytes: bytes) -> tuple[ColaRecord, VerificationResult]:
+    def verify_pdf(self, pdf_bytes: bytes) -> tuple[ColaRecord, VerificationResult]:
+        """Full COLA-upload flow, timed end-to-end for the user-facing latency badge."""
+        start = time.perf_counter()
         record = self.parse_cola(pdf_bytes)
-        return record, self.verify_record(record)
+        result = self.verify_record(record, started_at=start)
+        return record, result
 
-    def verify_record(self, record: ColaRecord) -> VerificationResult:
-        return self._run(record.claimed, record.label_images)
+    def verify_cola(self, pdf_bytes: bytes) -> tuple[ColaRecord, VerificationResult]:
+        return self.verify_pdf(pdf_bytes)
+
+    def verify_record(
+        self, record: ColaRecord, started_at: float | None = None
+    ) -> VerificationResult:
+        started_at = started_at if started_at is not None else time.perf_counter()
+        result = self._run(record.claimed, record.label_images)
+        result.processing_ms = self._elapsed_ms(started_at)
+        return result
 
     def verify_manual(
         self, claimed: ClaimedFields, images: list[LabelImage]
     ) -> VerificationResult:
-        return self._run(claimed, images)
+        start = time.perf_counter()
+        result = self._run(claimed, images)
+        result.processing_ms = self._elapsed_ms(start)
+        return result
 
     def _run(self, claimed: ClaimedFields, images: list[LabelImage]) -> VerificationResult:
-        start = time.perf_counter()
         extracted = self._get_extractor().extract(images)
         result = self._engine.verify(claimed, extracted)
-        result.processing_ms = int((time.perf_counter() - start) * 1000)
         return result
+
+    @staticmethod
+    def _elapsed_ms(started_at: float | None) -> int:
+        return int((time.perf_counter() - started_at) * 1000) if started_at is not None else 0

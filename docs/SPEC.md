@@ -246,9 +246,10 @@ data; not a runtime dependency — respects Marcus's firewall note).
 **In scope (high-value extras, stakeholder-requested / beneficial):** F5 batch, proof↔ABV
 cross-check, beverage-type rules, brand∪fanciful & DBA semantics, real+adversarial test corpus,
 Section 508, processing-time badge.
-**Out of scope:** COLA system integration; persistent storage / audit DB; auth/SSO; type-size /
-CPI / contrast certification (explicitly outside TTB's own COLA review — offered as advisory only);
-production FedRAMP hardening (documented as the production path, not built).
+**Out of scope:** COLA system integration; auth/SSO; type-size / CPI / contrast certification
+(explicitly outside TTB's own COLA review — offered as advisory only); production FedRAMP
+hardening (documented as the production path, not built). Optional persistence/audit storage is an
+added project enhancement beyond the PRD, not a core brief requirement.
 
 ---
 

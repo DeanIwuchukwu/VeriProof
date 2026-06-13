@@ -11,8 +11,8 @@ const EMPTY: ManualFields = {
   producer: "",
 };
 
-// Source drives the country-of-origin check (required iff IMPORTED). Blank → the
-// backend treats it as UNKNOWN and reports country of origin as NOT_CHECKED.
+// Source drives the country-of-origin check (required iff IMPORTED), so manual
+// submission stays disabled until a real source is selected.
 const SOURCE_OPTS = [
   { value: "", label: "— Select —" },
   { value: "domestic", label: "Domestic" },
@@ -30,6 +30,7 @@ export function ManualForm({
   const [images, setImages] = useState<File[]>([]);
   const imgRef = useRef<HTMLInputElement>(null);
   const fid = useId();
+  const canSubmit = !!fields.source && images.length > 0 && !busy;
 
   const set = (k: keyof ManualFields, v: string) => setFields((f) => ({ ...f, [k]: v }));
   const input = (k: keyof ManualFields, label: string, placeholder = "") => (
@@ -87,7 +88,7 @@ export function ManualForm({
         )}
       </div>
 
-      <button className="btn-primary" disabled={!images.length || busy} onClick={() => onVerify(fields, images)}>
+      <button className="btn-primary" disabled={!canSubmit} onClick={() => onVerify(fields, images)}>
         {busy ? "Reading label…" : "Verify label"}
       </button>
     </>

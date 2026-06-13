@@ -25,10 +25,10 @@ auto-approves or auto-rejects.
 - **Assistive & accessible.** Color-coded results (status by icon **+** text **+** color), read
   confidence, processing-time badge, plain-English reasons, keyboard/screen-reader friendly
   (Section 508-minded).
-- **Saved verifications & reviewer decisions.** Each verification (claimed fields, results, and the
-  original COLA PDF) is stored in PostgreSQL, and reviewers can Accept/Reject with a note —
-  recorded append-only as an audit trail. Optional: with no `DATABASE_URL` configured the app runs
-  fully stateless (nothing persisted).
+- **Saved verifications & reviewer decisions.** As an added feature beyond the PRD, each
+  verification (claimed fields, results, and the original COLA PDF) can be stored in PostgreSQL,
+  and reviewers can Accept/Reject with a note — recorded append-only as an audit trail. Optional:
+  with no `DATABASE_URL` configured the app runs fully stateless (nothing persisted).
 
 ### Verified on the real sample records
 
@@ -159,10 +159,11 @@ cd ../frontend && npx tsc --noEmit                            # frontend typeche
 - **The COLA record carries both sides of the comparison.** Application fields and label images travel
   together in the 5100.31, so agents type nothing in the primary flow. Manual entry is the secondary
   path for ad-hoc checks and the brief's sample fields.
-- **Persistence is opt-in; no auth.** With `DATABASE_URL` set, verifications (incl. the original
-  PDF) and reviewer decisions are stored (PostgreSQL); without it the app is fully stateless.
-  Decisions are anonymous (no login system) and append-only. COLA-system integration remains out
-  of scope per the brief.
+- **Persistence is an extra, opt-in feature; no auth.** The PRD did not require storage, but this
+  prototype adds an optional audit trail: with `DATABASE_URL` set, verifications (incl. the
+  original PDF) and reviewer decisions are stored (PostgreSQL); without it the app is fully
+  stateless. Decisions are anonymous (no login system) and append-only. COLA-system integration
+  remains out of scope per the brief.
 - **Latency.** The raw vision read is ~2.5s; end-to-end on a normal network targets the brief's <5s.
   On a machine behind a **TLS-inspecting proxy** (as the dev machine was) times are inflated to ~8–9s
   — an environment artifact, not the product. `truststore` is included so such proxies don't break TLS.
@@ -171,8 +172,8 @@ cd ../frontend && npx tsc --noEmit                            # frontend typeche
   A confidently-read *altered* warning still fails.
 - **Bold / exact type-size detection** is best-effort and clearly labeled — it is outside TTB's own
   COLA review scope.
-- **Model choice.** Sonnet is the default (accuracy); Haiku was measured ~2× faster on simple labels
-  but repeatably garbled small back-label text, so it's opt-in via env.
+- **Model choice.** `gpt-5.4-mini` is the default because it best fits the PRD's sub-5-second goal
+  while still handling the label set well. Other models remain opt-in via env for comparison.
 
 ---
 

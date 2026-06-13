@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Literal
@@ -70,6 +71,7 @@ async def verify_cola(
     data = await file.read()
     if not data:
         raise HTTPException(status_code=422, detail="The uploaded file is empty.")
+    started_at = time.perf_counter()
     try:
         record = service.parse_cola(data)
     except Exception as e:  # noqa: BLE001 — never leak a stack trace to the client
@@ -78,7 +80,7 @@ async def verify_cola(
             detail=f"Could not read this COLA record. Is it a valid TTB 5100.31 PDF? ({type(e).__name__})",
         ) from e
     try:
-        result = service.verify_record(record)
+        result = service.verify_record(record, started_at=started_at)
     except ValueError as e:  # provider misconfig (e.g. missing key)
         raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001 — operational failure after a successful parse
