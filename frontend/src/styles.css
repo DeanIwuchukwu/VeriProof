@@ -1022,25 +1022,10 @@ textarea {
 .history-head,
 .history-row {
   display: grid;
-  grid-template-columns: 115px 1.5fr 1.2fr 0.9fr 1.1fr 30px;
+  grid-template-columns: 115px 1.75fr 1.35fr 0.9fr 1.25fr;
   gap: 12px;
   padding: 8px 16px;
   align-items: center;
-}
-.row-delete {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--faint);
-  cursor: pointer;
-}
-.row-delete:hover {
-  background: var(--fail-bg);
-  color: var(--fail-text);
 }
 .history-head {
   border-bottom: 1px solid var(--divider-2);

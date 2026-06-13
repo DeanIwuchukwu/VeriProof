@@ -1,25 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { deleteVerification, getVerificationDetail, listVerifications, pdfUrl } from "../api";
+import { getVerificationDetail, listVerifications, pdfUrl } from "../api";
 import type { HistoryDetail, HistoryItem } from "../types";
 import { ResultBody, StatusBadge, toFieldView } from "./reportViews";
-
-const TrashIcon = () => (
-  <svg
-    width="13"
-    height="13"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M3 6h18" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </svg>
-);
 
 export function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -100,20 +82,6 @@ export function HistoryPanel({
   useEffect(() => {
     onContextChange?.({ items: items ?? [], openVerificationId: openId });
   }, [items, openId, onContextChange]);
-
-  async function remove(it: HistoryItem) {
-    const what = it.filename ?? it.brand_name ?? "this record";
-    if (!window.confirm(`Delete the saved verification of ${what} (and its decisions)? This cannot be undone.`)) {
-      return;
-    }
-    try {
-      await deleteVerification(it.verification_id);
-      setItems((list) => (list ? list.filter((x) => x.verification_id !== it.verification_id) : list));
-      if (openId === it.verification_id) setOpenId(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete the record.");
-    }
-  }
 
   async function toggle(id: string) {
     if (openId === id) {
@@ -199,7 +167,6 @@ export function HistoryPanel({
           <span className="col-label">BRAND</span>
           <span className="col-label">RESULT</span>
           <span className="col-label">DECISION</span>
-          <span className="col-label" aria-hidden="true" />
         </div>
         {groups.length === 0 && (
           <p className="note" style={{ padding: "14px 16px" }}>
@@ -224,7 +191,6 @@ export function HistoryPanel({
                 detail={open ? detail : undefined}
                 detailError={open ? detailError : null}
                 onToggle={() => void toggle(it.verification_id)}
-                onDelete={() => void remove(it)}
               />
             );
           });
@@ -240,7 +206,6 @@ function HistoryRow({
   detail,
   detailError,
   onToggle,
-  onDelete,
   older = false,
   runCount,
   runsOpen = false,
@@ -251,7 +216,6 @@ function HistoryRow({
   detail?: HistoryDetail;
   detailError: string | null;
   onToggle: () => void;
-  onDelete: () => void;
   older?: boolean;
   runCount?: number;
   runsOpen?: boolean;
@@ -296,17 +260,6 @@ function HistoryRow({
           ) : (
             <span className="cell-val">—</span>
           )}
-        </span>
-        <span onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className="row-delete"
-            title="Delete this saved verification"
-            aria-label={`Delete saved verification of ${it.filename ?? it.brand_name ?? "record"}`}
-            onClick={onDelete}
-          >
-            <TrashIcon />
-          </button>
         </span>
       </div>
 
