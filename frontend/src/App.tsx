@@ -3,12 +3,13 @@ import { verifyBatch, verifyCola, verifyManual } from "./api";
 import { BatchResultsPanel } from "./components/BatchResultsPanel";
 import { BatchUpload } from "./components/BatchUpload";
 import { ColaUpload } from "./components/ColaUpload";
+import { HistoryChatPanel } from "./components/HistoryChatPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { LabelPreview, type PreviewImage } from "./components/LabelPreview";
 import { ManualForm } from "./components/ManualForm";
 import { ResultsPanel } from "./components/ResultsPanel";
 import type { Density } from "./components/reportViews";
-import type { BatchResponse, ManualFields, VerifyResponse } from "./types";
+import type { BatchResponse, HistoryItem, ManualFields, VerifyResponse } from "./types";
 
 type Mode = "upload" | "manual" | "batch" | "history";
 
@@ -45,10 +46,11 @@ export default function App() {
   const [batch, setBatch] = useState<BatchResponse | null>(null);
   const [manualFiles, setManualFiles] = useState<File[]>([]);
   const [manualUrls, setManualUrls] = useState<string[]>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyOpenId, setHistoryOpenId] = useState<string | null>(null);
   // Bumped per verification run; keys the results panels so decision state resets.
   const [runSeq, setRunSeq] = useState(0);
 
-  // Object URLs for previewing manually-attached images (no backend bytes for manual mode).
   useEffect(() => {
     if (!manualFiles.length) {
       setManualUrls([]);
@@ -118,7 +120,6 @@ export default function App() {
       </header>
 
       <main className="main">
-        {/* Input panel */}
         <section className="panel" aria-label="Verification input">
           <div className="tabs" role="tablist" aria-label="Input mode">
             {TABS.map((t) => (
@@ -160,25 +161,28 @@ export default function App() {
             )}
             {mode === "batch" && <BatchUpload busy={busy} onVerify={runBatch} />}
             {mode === "history" && (
-              <p className="desc">
-                Saved verifications and reviewer decisions — click a row on the right for the full
-                report. Records verified from a COLA keep their original PDF.
-              </p>
+              <HistoryChatPanel items={historyItems} openVerificationId={historyOpenId} />
             )}
 
             {mode !== "batch" && previewImages.length > 0 && <LabelPreview images={previewImages} />}
 
-            <p className="panel-note">
-              This tool assists review by flagging items for a human compliance agent — it does not
-              approve or reject applications.
-            </p>
+            {mode !== "history" && (
+              <p className="panel-note">
+                This tool assists review by flagging items for a human compliance agent — it does not
+                approve or reject applications.
+              </p>
+            )}
           </div>
         </section>
 
-        {/* Results panel */}
         <section className="panel" aria-label="Verification results">
           {mode === "history" ? (
-            <HistoryPanel />
+            <HistoryPanel
+              onContextChange={({ items, openVerificationId }) => {
+                setHistoryItems(items);
+                setHistoryOpenId(openVerificationId);
+              }}
+            />
           ) : busy ? (
             <div className="panel-state">
               <div className="spinner" aria-hidden="true" />
@@ -191,7 +195,7 @@ export default function App() {
             </div>
           ) : error ? (
             <div className="panel-state error" role="alert">
-              <span className="panel-state-title">Couldn’t complete verification</span>
+              <span className="panel-state-title">Couldn't complete verification</span>
               <span className="panel-state-sub">{error}</span>
             </div>
           ) : batch ? (

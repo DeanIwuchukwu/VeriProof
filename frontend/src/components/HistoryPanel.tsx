@@ -33,7 +33,11 @@ export function fmtDate(iso: string | null): string {
 
 type HistoryFilter = "ALL" | "PASS" | "FLAG" | "FAIL";
 
-export function HistoryPanel() {
+export function HistoryPanel({
+  onContextChange,
+}: {
+  onContextChange?: (ctx: { items: HistoryItem[]; openVerificationId: string | null }) => void;
+}) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>("ALL");
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +96,10 @@ export function HistoryPanel() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    onContextChange?.({ items: items ?? [], openVerificationId: openId });
+  }, [items, openId, onContextChange]);
 
   async function remove(it: HistoryItem) {
     const what = it.filename ?? it.brand_name ?? "this record";

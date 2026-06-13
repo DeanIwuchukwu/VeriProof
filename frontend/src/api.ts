@@ -2,6 +2,8 @@ import type {
   BatchResponse,
   Decision,
   DecisionAction,
+  HistoryChatRequest,
+  HistoryChatResponse,
   HistoryDetail,
   HistoryItem,
   ManualFields,
@@ -59,6 +61,24 @@ async function getJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("Could not reach the verification service. Is the backend running?");
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(data?.detail || `Request failed (HTTP ${res.status}).`);
+  }
+  return (await res.json()) as T;
+}
+
 /** Saved verifications, newest first, each with its latest decision. */
 export function listVerifications(): Promise<{ items: HistoryItem[] }> {
   return getJson("/api/verifications");
@@ -67,6 +87,10 @@ export function listVerifications(): Promise<{ items: HistoryItem[] }> {
 /** One saved verification with its full field report and all decisions. */
 export function getVerificationDetail(id: string): Promise<HistoryDetail> {
   return getJson(`/api/verifications/${id}`);
+}
+
+export function historyChat(body: HistoryChatRequest): Promise<HistoryChatResponse> {
+  return postJson("/api/history/chat", body);
 }
 
 /** URL of the stored original COLA PDF. */

@@ -95,6 +95,32 @@ export interface HistoryDetail extends Omit<HistoryItem, "decision"> {
   decisions: Decision[];
 }
 
+export interface HistoryChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface HistoryChatCitation {
+  verification_id: string;
+  filename: string | null;
+  ttb_id: string | null;
+  page?: number | null;
+  source: string;
+}
+
+export interface HistoryChatRequest {
+  message: string;
+  open_verification_id: string | null;
+  visible_items: HistoryItem[];
+  recent_turns: HistoryChatTurn[];
+}
+
+export interface HistoryChatResponse {
+  answer: string;
+  citations: HistoryChatCitation[];
+  pdf_used: boolean;
+}
+
 export interface BatchItem {
   filename: string;
   verification_id: string | null;

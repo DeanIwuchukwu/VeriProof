@@ -26,6 +26,11 @@ from pydantic import BaseModel
 from app import db
 from app.cola.models import ClaimedFields, ColaRecord, LabelImage, ProductSource, ProductType
 from app.config import get_settings
+from app.history_chat import (
+    HistoryChatRequest,
+    HistoryChatResponse,
+    get_history_chat_service,
+)
 from app.matching.verdict import VerificationResult
 from app.service import VerificationService
 
@@ -356,6 +361,25 @@ async def get_verification_pdf(verification_id: str) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{filename or "record.pdf"}"'},
     )
+
+
+@app.post("/api/history/chat")
+async def history_chat(
+    body: HistoryChatRequest,
+    chat_service=Depends(get_history_chat_service),
+) -> JSONResponse:
+    """Ephemeral history-page assistant over saved runs and shortlisted PDFs."""
+    _require_db()
+    try:
+        result: HistoryChatResponse = await asyncio.to_thread(chat_service.answer, body)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(
+            status_code=503,
+            detail=f"The history assistant could not complete this request ({type(e).__name__}). Please try again.",
+        ) from e
+    return JSONResponse(result.model_dump())
 
 
 _IMG_MIME = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
